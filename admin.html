@@ -513,12 +513,21 @@ const ADMIN = {
         this.post('getSettings'),
         this.post('adminListLogs').catch(() => ({success:false, logs:[]}))
       ]);
-      if (stats.success) this.renderStats(stats.stats);
-      if (users.success) { this.data.users = users.users; USERS.render(); }
-      if (payments.success) { this.data.payments = payments.payments; PAYMENTS.render(); }
+      const failures = [];
+      if (stats.success) this.renderStats(stats.stats); else failures.push('stats: '+(stats.error||'unknown'));
+      if (users.success) { this.data.users = users.users; USERS.render(); } else failures.push('users: '+(users.error||'unknown'));
+      if (payments.success) { this.data.payments = payments.payments; PAYMENTS.render(); } else failures.push('payments: '+(payments.error||'unknown'));
       if (settings.success) { this.data.settings = settings.settings; SETTINGS.load(); }
       if (logs.success) { this.data.logs = logs.logs; LOGS.render(); }
-      this.toast('✅ Data refreshed');
+      if (failures.length) {
+        this.toast('❌ Some data failed to load — ' + failures[0] + (failures.length>1 ? ` (+${failures.length-1} more)` : ''));
+        // Auth failures specifically mean the stored admin session is stale/invalid.
+        if (failures.some(f => /auth failed/i.test(f))) {
+          this.toast('🔒 Admin session invalid — please log out and back in.');
+        }
+      } else {
+        this.toast('✅ Data refreshed');
+      }
     } catch(e) { this.toast('❌ Refresh failed: ' + e.message); }
     this.hideLoading();
   },
