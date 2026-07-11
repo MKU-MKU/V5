@@ -47,6 +47,7 @@ const S = {
 function _load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
 function _save(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{toast('⚠️ Storage full — some data not saved');return false}}
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function jsesc(s){return String(s||'').replace(/[\\'"]/g,function(m){return{'\\':'\\\\',"'":"\'",'"':'\"'}[m]})}
 function shuf(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
 function fmt(s){if(s<0)s=0;return`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -561,7 +562,7 @@ const REV = {
   _removeOne(kind, uid){
     const arr=REV._store(kind);
     const i=arr.findIndex(x=>x.uid===uid);
-    if(i>-1){arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();}
+    if(i>-1){arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();toast('\u{1F5D1} Removed');}
   },
   clearAll(kind){
     if(!confirm('Clear this whole list?'))return;
