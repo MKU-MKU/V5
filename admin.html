@@ -249,7 +249,6 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 </style>
 <base target="_blank">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body>
 
@@ -262,9 +261,9 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
       <p>HAMRO AFNAI v4.0 Management</p>
     </div>
     <div class="err" id="err"></div>
-    <div class="fld"><label>Admin Username</label><input type="text" id="ad-user" placeholder="admin" autocomplete="username" autocapitalize="none"></div>
-    <div class="fld"><label>Password</label><input type="password" id="ad-pass" placeholder="••••••••" autocomplete="current-password"></div>
-    <button class="btn" id="btn-login" onclick="ADMIN.login()">Enter Admin Panel →</button>
+    <div class="fld"><label>Admin Username</label><input type="text" id="ad-user" placeholder="admin" autocomplete="username" autocapitalize="none" onkeydown="if(event.key==='Enter')ADMIN.login()"></div>
+    <div class="fld"><label>Password</label><input type="password" id="ad-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')ADMIN.login()"></div>
+    <button type="button" class="btn" id="btn-login" onclick="ADMIN.login()">Enter Admin Panel →</button>
     <div class="link-row"><a onclick="localStorage.removeItem('hau_admin'); localStorage.removeItem('hau_session'); location.href='index.html'">← Back to User Login</a></div>
   </div>
 </div>
@@ -512,7 +511,7 @@ const ADMIN = {
       this.unlock();
       this.toast('✅ Welcome to Admin World');
     } catch(e) { this.showErr(e.message || 'Login failed. Check connection.'); }
-    this.setLoading(false);
+    finally { this.setLoading(false); }
   },
 
   unlock() {
@@ -543,13 +542,23 @@ const ADMIN = {
   // SECURE: POST with JSON body
   async post(action, params={}) {
     const body = {action, ...params, adminToken: this.creds?.token};
-    const r = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'text/plain'},
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) throw new Error('Network error: ' + r.status);
-    return await r.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const r = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('Network error: ' + r.status);
+      return await r.json();
+    } catch(err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('Request timed out — server not responding. Check your connection or try again.');
+      throw err;
+    }
   },
 
   async refresh() {
