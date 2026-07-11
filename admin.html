@@ -511,7 +511,7 @@ const ADMIN = {
       this.unlock();
       this.toast('✅ Welcome to Admin World');
     } catch(e) { this.showErr(e.message || 'Login failed. Check connection.'); }
-    finally { this.setLoading(false); }
+    this.setLoading(false);
   },
 
   unlock() {
@@ -542,23 +542,13 @@ const ADMIN = {
   // SECURE: POST with JSON body
   async post(action, params={}) {
     const body = {action, ...params, adminToken: this.creds?.token};
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    try {
-      const r = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: {'Content-Type': 'text/plain'},
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      if (!r.ok) throw new Error('Network error: ' + r.status);
-      return await r.json();
-    } catch(err) {
-      clearTimeout(timer);
-      if (err.name === 'AbortError') throw new Error('Request timed out — server not responding. Check your connection or try again.');
-      throw err;
-    }
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error('Network error: ' + r.status);
+    return await r.json();
   },
 
   async refresh() {
@@ -918,9 +908,7 @@ const USERS = {
   },
 
   async del(username) {
-    if (!confirm('Delete user "' + username + '"? This cannot be undone.
-
-All associated data (payments, progress) will also be deleted.')) return;
+    if (!confirm('Delete user "' + username + '"? This cannot be undone.\n\nAll associated data (payments, progress) will also be deleted.')) return;
     ADMIN.showLoading('Deleting user…');
     try {
       const res = await ADMIN.post('adminDeleteUser', {username});
@@ -1266,7 +1254,1288 @@ const LOGS = {
 // ═══════════════════════════════════════════════════════════════
 // AUTO-REFRESH & INIT
 // ═══════════════════════════════════════════════════════════════
-ADMIN.init();
+console.log("[ADMIN] Initializing admin panel..."); ADMIN.init();
+
+// Auto-refresh every 60 seconds when tab is active
+setInterval(() => {
+  if (!document.hidden && ADMIN.creds) {
+    ADMIN.refresh();
+  }
+}, 60000);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'r') { e.preventDefault(); ADMIN.refresh(); }
+    if (e.key === '1') { e.preventDefault(); UI.nav('dashboard'); }
+    if (e.key === '2') { e.preventDefault(); UI.nav('users'); }
+    if (e.key === '3') { e.preventDefault(); UI.nav('payments'); }
+    if (e.key === '4') { e.preventDefault(); UI.nav('logs'); }
+    if (e.key === '5') { e.preventDefault(); UI.nav('settings'); }
+  }
+  if (e.key === 'Escape') {
+    MODAL.close('review'); MODAL.close('user'); MODAL.close('pwd');
+  }
+});
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#080B14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="HAMRO AFNAI Admin Panel — Manage users, payments, and platform settings.">
+<title>HAMRO AFNAI — Admin World</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--c0:#080B14;--c1:#0D1221;--c2:#121829;--c3:#18203A;--c4:#1E2847;--c5:#243055;--b0:rgba(255,255,255,.04);--b1:rgba(255,255,255,.08);--b2:rgba(255,255,255,.13);--b3:rgba(255,255,255,.20);--amb:#F5A623;--amb2:#D4880F;--amb-glow:rgba(245,166,35,.28);--teal:#00C2A8;--teal2:#009F8A;--teal-glow:rgba(0,194,168,.26);--vio:#8B5CF6;--vio2:#6D28D9;--vio-glow:rgba(139,92,246,.32);--sky:#38BDF8;--sky-glow:rgba(56,189,248,.28);--grn:#22C55E;--grn-glow:rgba(34,197,94,.26);--ros:#F43F5E;--ros-glow:rgba(244,63,94,.28);--ok:var(--grn);--ok-bg:rgba(34,197,94,.12);--ok-bd:rgba(34,197,94,.35);--bad:var(--ros);--bad-bg:rgba(244,63,94,.11);--bad-bd:rgba(244,63,94,.35);--warn:var(--amb);--warn-bg:rgba(245,166,35,.11);--warn-bd:rgba(245,166,35,.35);--t1:#EEF2FF;--t2:#8B9CC8;--t3:#4A5680;--ff:'Inter',system-ui,sans-serif;--fd:'Space Grotesk',system-ui,sans-serif;--fm:'JetBrains Mono',monospace;--r1:8px;--r2:12px;--r3:16px;--r4:22px;--ease:.15s cubic-bezier(.4,0,.2,1);--spring:.22s cubic-bezier(.34,1.56,.64,1);--eout:.2s cubic-bezier(0,0,.2,1)}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:4px}
+::selection{background:rgba(245,166,35,.22);color:var(--t1)}
+
+/* LOGIN GATE */
+#gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--c0);flex-direction:column}
+.gate-card{width:100%;max-width:400px;margin:1rem;background:rgba(13,18,33,.92);backdrop-filter:blur(32px);border:1px solid rgba(255,255,255,.08);border-radius:var(--r4);padding:2rem 1.5rem;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:enter .4s var(--spring)}
+@keyframes enter{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
+.gate-logo{text-align:center;margin-bottom:1.4rem}
+.gate-logo .icon{width:60px;height:60px;margin:0 auto .6rem;background:linear-gradient(140deg,var(--amb2),var(--amb));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;box-shadow:0 0 20px rgba(245,166,35,.3),inset 0 1px 0 rgba(255,255,255,.2)}
+.gate-logo h1{font-family:var(--fd);font-size:1.4rem;font-weight:700;background:linear-gradient(90deg,var(--amb),#FDE68A);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.gate-logo p{font-size:.62rem;color:var(--t3);margin-top:.2rem;font-weight:600;text-transform:uppercase;letter-spacing:1.2px}
+.fld{margin-bottom:.75rem}
+.fld label{display:block;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.3rem}
+.fld input{width:100%;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:.7rem .85rem;color:var(--t1);font-size:.88rem;font-family:var(--ff);outline:none;transition:border-color var(--ease),box-shadow var(--ease)}
+.fld input:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(245,166,35,.12)}
+.fld input::placeholder{color:var(--t3);opacity:.5}
+.btn{width:100%;padding:.82rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:#0F0A00;font-size:.92rem;font-weight:700;font-family:var(--fd);cursor:pointer;transition:all var(--ease);box-shadow:0 4px 20px rgba(245,166,35,.3),inset 0 1px 0 rgba(255,255,255,.18);letter-spacing:.3px}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 28px rgba(245,166,35,.45)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:spin .65s linear infinite;vertical-align:middle;margin-right:.4rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);border-radius:8px;padding:.5rem .85rem;color:#ff9aaa;font-size:.76rem;margin-bottom:.8rem;display:none;align-items:center;gap:.4rem}
+.err.show{display:flex}
+.link-row{text-align:center;margin-top:1rem;font-size:.76rem;color:var(--t3)}
+.link-row a{color:var(--amb);cursor:pointer;text-decoration:underline;font-weight:700}
+
+/* ADMIN APP */
+#app{display:none;flex-direction:column;min-height:100vh}
+#app.on{display:flex}
+
+/* TOPBAR */
+#tb{height:56px;background:rgba(8,11,20,.92);backdrop-filter:blur(32px) saturate(1.6);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 1rem;position:sticky;top:0;z-index:500;flex-shrink:0}
+.tb-brand{display:flex;align-items:center;gap:.55rem;font-family:var(--fd);font-size:.95rem;font-weight:700;color:var(--t1);cursor:pointer}
+.tb-brand .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--amb2),var(--amb));display:flex;align-items:center;justify-content:center;font-size:.9rem;box-shadow:0 0 14px rgba(245,166,35,.4),inset 0 1px 0 rgba(255,255,255,.2)}
+.tb-r{display:flex;align-items:center;gap:.3rem}
+.tb-btn{background:var(--b0);border:1px solid var(--b1);color:var(--t2);border-radius:var(--r1);padding:.28rem .55rem;font-size:.68rem;font-weight:600;cursor:pointer;font-family:var(--ff);display:flex;align-items:center;gap:.22rem;transition:all var(--ease);white-space:nowrap;height:32px}
+.tb-btn:hover{background:var(--b1);color:var(--t1);border-color:var(--b2)}
+.tb-btn.danger{color:var(--ros);border-color:var(--bad-bd)}.tb-btn.danger:hover{background:var(--bad-bg)}
+.tb-btn.amber{color:var(--amb);border-color:var(--warn-bd)}.tb-btn.amber:hover{background:var(--warn-bg)}
+#menu-btn{display:none}
+@media(max-width:900px){#menu-btn{display:flex !important}}
+
+/* LAYOUT */
+#layout{display:flex;flex:1;min-height:0;overflow:hidden}
+#sb{width:240px;flex-shrink:0;background:var(--c1);border-right:1px solid var(--b1);overflow-y:auto;padding:.7rem .5rem;transition:transform var(--eout);display:flex;flex-direction:column}
+@media(max-width:900px){
+  #sb{position:fixed;left:0;top:56px;bottom:0;z-index:400;transform:translateX(-110%);width:260px;box-shadow:none}
+  #sb.open{transform:translateX(0);box-shadow:0 12px 48px rgba(0,0,0,.72)}
+}
+#ov{display:none;position:fixed;inset:0;z-index:399;background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
+#ov.show{display:block}
+.sb-close{display:none;align-items:center;justify-content:center;width:30px;height:30px;margin:0 0 .6rem auto;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.85rem;cursor:pointer;transition:all var(--ease)}
+.sb-close:hover{background:var(--bad-bg);color:var(--ros);border-color:var(--bad-bd)}
+@media(max-width:900px){.sb-close{display:flex}}
+.sb-item{display:flex;align-items:center;gap:.48rem;padding:.5rem .55rem;border-radius:var(--r1);font-size:.78rem;font-weight:500;color:var(--t2);cursor:pointer;transition:all var(--ease);margin-bottom:2px;border:1px solid transparent;position:relative}
+.sb-item:hover{background:var(--b0);color:var(--t1)}
+.sb-item.active{background:linear-gradient(90deg,rgba(245,166,35,.14),rgba(245,166,35,.05));color:var(--amb);border-color:rgba(245,166,35,.2);font-weight:600}
+.sb-item.active .sb-ic{filter:drop-shadow(0 0 4px rgba(245,166,35,.5))}
+.sb-ic{width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;border-radius:6px;transition:all var(--ease)}
+.sb-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3);padding:.3rem .48rem .15rem;margin-bottom:.1rem}
+.sb-div{height:1px;background:var(--b1);margin:.35rem .48rem}
+.sb-badge{margin-left:auto;background:var(--vio);color:#fff;font-size:.56rem;padding:.08rem .34rem;border-radius:20px;font-weight:700}
+.sb-badge.ok{background:var(--grn)}.sb-badge.amb{background:var(--amb);color:#000}
+
+#main{flex:1;overflow-y:auto;padding:1.1rem 1.1rem 1.8rem}
+@media(max-width:900px){#main{padding:.8rem .7rem calc(1.2rem)}}
+
+.view{display:none}
+.view.on{display:block;animation:vfade .16s var(--eout)}
+@keyframes vfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ph{margin-bottom:1rem}
+.ph h2{font-family:var(--fd);font-size:1.15rem;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:.42rem;color:var(--t1)}
+.ph p{font-size:.74rem;color:var(--t2);margin-top:.18rem;line-height:1.5}
+
+/* CARDS */
+.card{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r3);padding:1rem 1.05rem;box-shadow:0 1px 8px rgba(0,0,0,.4);margin-bottom:.8rem}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:1px solid var(--b1)}
+.card-hd h3{font-family:var(--fd);font-size:.88rem;font-weight:600;display:flex;align-items:center;gap:.38rem}
+.ctag{font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;padding:.14rem .5rem;border-radius:20px;display:inline-flex;align-items:center;gap:.22rem}
+.tc{background:rgba(56,189,248,.12);color:var(--sky)}.tp{background:rgba(139,92,246,.13);color:var(--vio)}
+.tg{background:rgba(34,197,94,.11);color:var(--grn)}.ta{background:rgba(245,166,35,.13);color:var(--amb)}.tr{background:rgba(244,63,94,.11);color:var(--ros)}
+
+/* STAT CARDS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem;margin-bottom:.85rem}
+@media(max-width:700px){.stats-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:400px){.stats-grid{grid-template-columns:1fr}}
+.stat-card{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r2);padding:1rem .7rem;text-align:center;position:relative;overflow:hidden;transition:transform var(--spring),box-shadow var(--ease);cursor:pointer}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r2) var(--r2) 0 0}
+.stat-card.c-vio::after{background:linear-gradient(90deg,var(--vio),var(--sky))}
+.stat-card.c-sky::after{background:var(--sky)}
+.stat-card.c-grn::after{background:var(--grn)}
+.stat-card.c-amb::after{background:var(--amb)}
+.stat-card.c-ros::after{background:var(--ros)}
+.stat-card.c-teal::after{background:var(--teal)}
+.stat-v{font-family:var(--fm);font-size:1.6rem;font-weight:700;line-height:1}
+.stat-l{font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-top:.2rem}
+
+/* BUTTONS */
+.btn-s{display:inline-flex;align-items:center;justify-content:center;gap:.28rem;padding:.44rem .88rem;border-radius:var(--r1);font-size:.76rem;font-weight:600;font-family:var(--ff);cursor:pointer;border:1.5px solid transparent;transition:all var(--ease);white-space:nowrap;user-select:none}
+.btn-s:disabled{opacity:.42;cursor:not-allowed}
+.btn-g{background:var(--ok-bg);color:var(--grn);border-color:var(--ok-bd)}
+.btn-g:hover:not(:disabled){background:var(--grn);color:#fff;box-shadow:0 0 18px var(--grn-glow)}
+.btn-r{background:var(--bad-bg);color:var(--ros);border-color:var(--bad-bd)}
+.btn-r:hover:not(:disabled){background:var(--ros);color:#fff;box-shadow:0 0 18px var(--ros-glow)}
+.btn-a{background:var(--warn-bg);color:var(--amb);border-color:var(--warn-bd)}
+.btn-a:hover:not(:disabled){background:var(--amb);color:#000;box-shadow:0 0 18px var(--amb-glow)}
+.btn-p{background:rgba(139,92,246,.11);color:var(--vio);border-color:rgba(139,92,246,.26)}
+.btn-p:hover:not(:disabled){background:var(--vio);color:#fff;box-shadow:0 0 20px var(--vio-glow)}
+.btn-c{background:rgba(56,189,248,.1);color:var(--sky);border-color:rgba(56,189,248,.25)}
+.btn-c:hover:not(:disabled){background:var(--sky);color:#000;box-shadow:0 0 20px var(--sky-glow)}
+.btn-sm{padding:.26rem .58rem;font-size:.68rem}
+.btn-lg{padding:.6rem 1.2rem;font-size:.84rem}
+.btn-blk{width:100%;display:flex}
+.bg{display:flex;gap:.38rem;flex-wrap:wrap}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--b1);border-radius:var(--r2);background:var(--c2)}
+table{width:100%;border-collapse:collapse;font-size:.76rem}
+th{background:var(--c1);color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-size:.6rem;padding:.55rem .7rem;text-align:left;border-bottom:1px solid var(--b1)}
+td{padding:.5rem .7rem;border-bottom:1px solid var(--b1);color:var(--t2);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+tr:last-child td{border-bottom:none}
+.mono{font-family:var(--fm);font-size:.72rem}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:.2rem;padding:.12rem .4rem;border-radius:20px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.badge-trial{background:rgba(56,189,248,.12);color:var(--sky);border:1px solid rgba(56,189,248,.25)}
+.badge-active{background:rgba(34,197,94,.12);color:var(--grn);border:1px solid rgba(34,197,94,.3)}
+.badge-expired{background:rgba(244,63,94,.12);color:var(--ros);border:1px solid rgba(244,63,94,.3)}
+.badge-pending{background:rgba(245,166,35,.12);color:var(--amb);border:1px solid rgba(245,166,35,.3)}
+.badge-verified{background:rgba(34,197,94,.12);color:var(--grn);border:1px solid rgba(34,197,94,.3)}
+.badge-rejected{background:rgba(244,63,94,.12);color:var(--ros);border:1px solid rgba(244,63,94,.3)}
+.badge-1year{background:rgba(139,92,246,.12);color:var(--vio);border:1px solid rgba(139,92,246,.25)}
+
+/* Search & Filter */
+.toolbar{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center}
+.toolbar input,.toolbar select{background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .65rem;color:var(--t1);font-size:.76rem;font-family:var(--ff);outline:none}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(245,166,35,.12)}
+.toolbar input{flex:1;min-width:180px}
+
+/* Settings Form */
+.sf{margin-bottom:.65rem}
+.sf label{display:block;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.28rem}
+.sf input,.sf textarea,.sf select{width:100%;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.55rem .75rem;color:var(--t1);font-size:.8rem;font-family:var(--ff);outline:none;transition:border-color var(--ease),box-shadow var(--ease)}
+.sf input:focus,.sf textarea:focus,.sf select:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(245,166,35,.12)}
+.sf textarea{resize:vertical;min-height:80px}
+.sf .hint{font-size:.68rem;color:var(--t3);margin-top:.25rem}
+
+/* Admin tier selector */
+.adm-tier{display:flex;gap:.4rem;margin:.4rem 0}
+.adm-tier button{flex:1;padding:.4rem .6rem;border-radius:var(--r1);font-size:.7rem;font-weight:600;border:1px solid var(--b1);background:var(--c1);color:var(--t2);cursor:pointer;transition:all var(--ease)}
+.adm-tier button.sel{background:var(--amb);color:#000;border-color:var(--amb);box-shadow:0 0 12px rgba(245,166,35,.3)}
+
+/* Modal */
+.mbg{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:1rem}
+.mbg.show{display:flex}
+.mbox{background:var(--c2);border:1px solid var(--b2);border-radius:var(--r4);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.7);animation:mfade .16s var(--spring)}
+.mbox.wide{max-width:640px}
+@keyframes mfade{from{opacity:0;transform:scale(.93) translateY(8px)}to{opacity:1;transform:none}}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem .6rem;border-bottom:1px solid var(--b1)}
+.mhd h3{font-family:var(--fd);font-size:.88rem;font-weight:700}
+.mcl{background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:.8rem;transition:all var(--ease)}
+.mcl:hover{background:var(--bad-bg);color:var(--ros);border-color:var(--bad-bd)}
+.mbody{padding:.9rem 1rem}
+
+/* Toasts */
+#toasts{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:9000;display:flex;flex-direction:column;align-items:center;gap:.3rem;pointer-events:none;width:calc(100vw - 2rem);max-width:340px}
+.toast{background:rgba(18,24,41,.97);border:1px solid var(--b2);backdrop-filter:blur(20px);border-radius:var(--r2);padding:.55rem 1rem;font-size:.78rem;font-weight:600;color:var(--t1);box-shadow:0 8px 32px rgba(0,0,0,.5);animation:tin .18s var(--spring);pointer-events:auto;max-width:100%;text-align:center}
+.toast.out{animation:tout .2s ease forwards}
+@keyframes tin{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
+
+.empty{text-align:center;padding:2rem 1rem;color:var(--t3)}.empty-i{font-size:2rem;margin-bottom:.4rem}
+
+hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
+
+/* Pagination */
+.pg{display:flex;align-items:center;justify-content:center;gap:.3rem;margin-top:.7rem}
+.pg button{background:var(--b0);border:1px solid var(--b1);color:var(--t2);border-radius:var(--r1);padding:.3rem .55rem;font-size:.72rem;font-weight:600;cursor:pointer;transition:all var(--ease);min-width:28px}
+.pg button:hover:not(:disabled){background:var(--b1);color:var(--t1)}
+.pg button:disabled{opacity:.4;cursor:not-allowed}
+.pg button.on{background:var(--amb);color:#000;border-color:var(--amb)}
+.pg-info{font-size:.68rem;color:var(--t3);margin-left:.5rem}
+
+/* Loading overlay */
+.ld-overlay{position:fixed;inset:0;z-index:8000;background:rgba(8,11,20,.7);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:.6rem}
+.ld-overlay.show{display:flex}
+.ld-spin{width:32px;height:32px;border:3px solid rgba(245,166,35,.2);border-top-color:var(--amb);border-radius:50%;animation:spin .8s linear infinite}
+.ld-text{font-size:.78rem;color:var(--t2);font-weight:600}
+
+/* Detail grid */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+@media(max-width:500px){.dgrid{grid-template-columns:1fr}}
+.ditem{padding:.5rem .6rem;background:var(--b0);border-radius:var(--r1);border:1px solid var(--b1)}
+.ditem label{display:block;font-size:.58rem;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:.15rem;font-weight:700}
+.ditem val{display:block;font-size:.78rem;color:var(--t1);font-weight:600;word-break:break-word}
+
+/* Checkbox */
+.chk{width:16px;height:16px;accent-color:var(--amb);cursor:pointer}
+
+/* Bulk bar */
+.bulk-bar{display:none;align-items:center;gap:.5rem;padding:.5rem .7rem;background:linear-gradient(90deg,rgba(245,166,35,.1),rgba(245,166,35,.05));border:1px solid rgba(245,166,35,.2);border-radius:var(--r1);margin-bottom:.6rem;font-size:.74rem}
+.bulk-bar.show{display:flex}
+
+/* Activity log */
+.log-item{padding:.5rem .6rem;border-bottom:1px solid var(--b1);font-size:.74rem}
+.log-item:last-child{border-bottom:none}
+.log-time{font-size:.62rem;color:var(--t3);font-family:var(--fm)}
+.log-action{color:var(--amb);font-weight:600}
+
+/* Tag pills for admin */
+.tag-bar{display:flex;gap:.3rem;flex-wrap:wrap;margin:.4rem 0}
+.tag-pill{background:var(--b0);border:1px solid var(--b1);border-radius:20px;padding:.15rem .45rem;font-size:.6rem;font-weight:600;color:var(--t3);cursor:pointer;transition:all var(--ease)}
+.tag-pill:hover{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.3);color:var(--amb)}
+.tag-pill.active{background:rgba(245,166,35,.14);border-color:rgba(245,166,35,.35);color:var(--amb)}
+
+/* Toggle switch */
+.toggle-switch{position:relative;width:40px;height:22px;background:var(--c3);border-radius:20px;cursor:pointer;transition:background var(--ease);border:1px solid var(--b1);flex-shrink:0}
+.toggle-switch.on{background:var(--grn);border-color:var(--grn)}
+.toggle-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform var(--ease);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle-switch.on .toggle-knob{transform:translateX(18px)}
+
+/* Responsive */
+@media(max-width:600px){
+  .gate-card{padding:1.5rem 1.1rem;margin:.8rem}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .toolbar input{min-width:100px}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+
+<!-- LOGIN GATE -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-logo">
+      <div class="icon">🛡️</div>
+      <h1>Admin World</h1>
+      <p>HAMRO AFNAI v4.0 Management</p>
+    </div>
+    <div class="err" id="err"></div>
+    <div class="fld"><label>Admin Username</label><input type="text" id="ad-user" placeholder="admin" autocomplete="username" autocapitalize="none" onkeydown="if(event.key==='Enter')ADMIN.login()"></div>
+    <div class="fld"><label>Password</label><input type="password" id="ad-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')ADMIN.login()"></div>
+    <button type="button" class="btn" id="btn-login" onclick="ADMIN.login()">Enter Admin Panel →</button>
+    <div class="link-row"><a onclick="localStorage.removeItem('hau_admin'); localStorage.removeItem('hau_session'); location.href='index.html'">← Back to User Login</a></div>
+  </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div class="ld-overlay" id="ld-overlay">
+  <div class="ld-spin"></div>
+  <div class="ld-text" id="ld-text">Loading…</div>
+</div>
+
+<!-- ADMIN APP -->
+<div id="app">
+  <!-- TOPBAR -->
+  <div id="tb">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <button class="tb-btn" id="menu-btn" onclick="UI.sidebarOpen()" title="Menu">☰</button>
+      <div class="tb-brand" onclick="UI.nav('dashboard')">
+        <div class="mark">🛡️</div>
+        <span style="font-family:var(--fd);font-size:.9rem;font-weight:700">Admin World</span>
+      </div>
+    </div>
+    <div class="tb-r">
+      <div style="font-size:.68rem;color:var(--t3);font-weight:600;margin-right:.4rem" id="admin-name">admin</div>
+      <button class="tb-btn" onclick="ADMIN.refresh()" title="Refresh">🔄</button>
+      <button class="tb-btn" onclick="UI.nav('logs')" title="Activity Logs">📋</button>
+      <button class="tb-btn danger" onclick="ADMIN.logout()" title="Logout">⏻</button>
+    </div>
+  </div>
+
+  <div id="layout">
+    <div id="ov" onclick="UI.sidebarClose()"></div>
+
+    <!-- SIDEBAR -->
+    <div id="sb">
+      <button class="sb-close" onclick="UI.sidebarClose()">✕</button>
+      <div class="sb-lbl">Menu</div>
+      <div class="sb-item active" id="nav-dashboard" onclick="UI.nav('dashboard')"><div class="sb-ic">📊</div>Dashboard</div>
+      <div class="sb-item" id="nav-users" onclick="UI.nav('users')"><div class="sb-ic">👤</div>Users<span class="sb-badge" id="sb-users">0</span></div>
+      <div class="sb-item" id="nav-payments" onclick="UI.nav('payments')"><div class="sb-ic">💳</div>Payments<span class="sb-badge amb" id="sb-payments">0</span></div>
+      <div class="sb-item" id="nav-logs" onclick="UI.nav('logs')"><div class="sb-ic">📋</div>Activity Logs</div>
+      <div class="sb-item" id="nav-settings" onclick="UI.nav('settings')"><div class="sb-ic">⚙️</div>Settings</div>
+      <div class="sb-div"></div>
+      <div class="sb-item" onclick="localStorage.removeItem('hau_admin'); localStorage.removeItem('hau_session'); location.href='index.html'"><div class="sb-ic">🏠</div>User Portal</div>
+    </div>
+
+    <div id="main">
+      <!-- DASHBOARD -->
+      <div class="view on" id="view-dashboard">
+        <div class="ph"><h2>📊 Dashboard</h2><p>Overview of your study platform</p></div>
+        <div class="stats-grid" id="dash-stats">
+          <div class="stat-card c-vio" onclick="UI.nav('users')"><div class="stat-v" id="st-users">0</div><div class="stat-l">Total Users</div></div>
+          <div class="stat-card c-sky" onclick="USERS.filterBy('trial')"><div class="stat-v" id="st-trial">0</div><div class="stat-l">Trial Users</div></div>
+          <div class="stat-card c-grn" onclick="USERS.filterBy('active')"><div class="stat-v" id="st-active">0</div><div class="stat-l">Active / Paid</div></div>
+          <div class="stat-card c-ros" onclick="USERS.filterBy('expired')"><div class="stat-v" id="st-expired">0</div><div class="stat-l">Expired</div></div>
+          <div class="stat-card c-amb" onclick="USERS.filterBy('payment_pending')"><div class="stat-v" id="st-pending">0</div><div class="stat-l">Pending Pay</div></div>
+          <div class="stat-card c-teal" onclick="UI.nav('payments')"><div class="stat-v" id="st-payments">0</div><div class="stat-l">Total Payments</div></div>
+          <div class="stat-card c-grn" onclick="PAYMENTS.filterBy('verified')"><div class="stat-v" id="st-verified">0</div><div class="stat-l">Verified</div></div>
+          <div class="stat-card c-ros" onclick="PAYMENTS.filterBy('rejected')"><div class="stat-v" id="st-rejected">0</div><div class="stat-l">Rejected</div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>⚡ Quick Actions</h3></div>
+          <div class="bg">
+            <button class="btn-s btn-g" onclick="UI.nav('users')">👤 Manage Users</button>
+            <button class="btn-s btn-a" onclick="UI.nav('payments')">💳 Review Payments</button>
+            <button class="btn-s btn-p" onclick="UI.nav('settings')">⚙️ Edit Settings</button>
+            <button class="btn-s btn-c" onclick="ADMIN.exportUsers()">📥 Export Users CSV</button>
+            <button class="btn-s btn-c" onclick="ADMIN.exportPayments()">📥 Export Payments CSV</button>
+            <button class="btn-s btn-r" onclick="ADMIN.changePassword()">🔐 Change Password</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div class="view" id="view-users">
+        <div class="ph"><h2>👤 Users</h2><p>Manage all registered accounts</p></div>
+        <div class="toolbar">
+          <input type="text" id="u-search" placeholder="🔍 Search username, name, email…" oninput="USERS.debouncedFilter()">
+          <select id="u-filter" onchange="USERS.filter()">
+            <option value="all">All Status</option>
+            <option value="trial">Trial</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="payment_pending">Pending Pay</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button class="btn-s btn-c" onclick="ADMIN.exportUsers()">📥 CSV</button>
+        </div>
+        <div class="tbl-wrap"><table id="users-tbl"><thead><tr>
+          <th><input type="checkbox" class="chk" id="u-chk-all" onchange="USERS.toggleAll()"></th>
+          <th>User</th><th>Contact</th><th>Status</th><th>Access Tier</th><th>Created</th><th style="text-align:right">Actions</th>
+        </tr></thead><tbody id="users-body"><tr><td colspan="7" class="empty"><div class="empty-i">📭</div><p>No users found</p></td></tr></tbody></table></div>
+        <div class="pg" id="u-pg"></div>
+      </div>
+
+      <!-- PAYMENTS -->
+      <div class="view" id="view-payments">
+        <div class="ph"><h2>💳 Payments</h2><p>Verify or reject payment submissions</p></div>
+        <div class="toolbar">
+          <input type="text" id="p-search" placeholder="🔍 Search username, TXN ID…" oninput="PAYMENTS.debouncedFilter()">
+          <select id="p-filter" onchange="PAYMENTS.filter()">
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="verified">Verified</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button class="btn-s btn-c" onclick="ADMIN.exportPayments()">📥 CSV</button>
+        </div>
+        <div class="bulk-bar" id="p-bulk">
+          <span id="p-bulk-count">0 selected</span>
+          <button class="btn-s btn-g btn-sm" onclick="PAYMENTS.bulkVerify()">✓ Verify All</button>
+          <button class="btn-s btn-r btn-sm" onclick="PAYMENTS.bulkReject()">✕ Reject All</button>
+          <button class="btn-s btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="PAYMENTS.clearSelection()">Clear</button>
+        </div>
+        <div class="tbl-wrap"><table id="payments-tbl"><thead><tr>
+          <th><input type="checkbox" class="chk" id="p-chk-all" onchange="PAYMENTS.toggleAll()"></th>
+          <th>User</th><th>TXN ID</th><th>Amount</th><th>Status</th><th>Submitted</th><th style="text-align:right">Actions</th>
+        </tr></thead><tbody id="payments-body"><tr><td colspan="7" class="empty"><div class="empty-i">📭</div><p>No payments found</p></td></tr></tbody></table></div>
+        <div class="pg" id="p-pg"></div>
+      </div>
+
+      <!-- ACTIVITY LOGS -->
+      <div class="view" id="view-logs">
+        <div class="ph"><h2>📋 Activity Logs</h2><p>Track all admin actions</p></div>
+        <div class="toolbar">
+          <input type="text" id="l-search" placeholder="🔍 Search action, admin, target…" oninput="LOGS.filter()">
+          <select id="l-filter" onchange="LOGS.filter()">
+            <option value="all">All Actions</option>
+            <option value="verify">Verified Payment</option>
+            <option value="reject">Rejected Payment</option>
+            <option value="delete_user">Deleted User</option>
+            <option value="delete_payment">Deleted Payment</option>
+            <option value="update_settings">Updated Settings</option>
+            <option value="update_user">Updated User</option>
+            <option value="grant_access">Granted Access</option>
+            <option value="login">Login</option>
+          </select>
+        </div>
+        <div class="card" id="logs-card">
+          <div class="empty" id="logs-empty"><div class="empty-i">📭</div><p>No activity logs</p></div>
+          <div id="logs-list"></div>
+        </div>
+        <div class="pg" id="l-pg"></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="view" id="view-settings">
+        <div class="ph"><h2>⚙️ Settings</h2><p>Configure payment, QR, and app info</p></div>
+        <div class="card">
+          <div class="card-hd"><h3>Payment Configuration</h3><span class="ctag tc">Core</span></div>
+          <div class="sf"><label>App Name</label><input type="text" id="set-name" placeholder="HAMRO AFNAI"></div>
+          <div class="sf"><label>QR Code Image URL</label><input type="text" id="set-qr" placeholder="https://drive.google.com/uc?export=view&id=..."></div>
+          <div class="sf"><label>Contact Phone</label><input type="text" id="set-phone" placeholder="9863200285"></div>
+          <div class="sf"><label>Payment Amount (Rs)</label><input type="number" id="set-amount" placeholder="100" min="1"></div>
+          <div class="sf"><label>Payment Instructions</label><textarea id="set-inst" placeholder="Instructions shown to users…"></textarea></div>
+          <div class="sf"><label>Trial Hours</label><input type="number" id="set-trial" placeholder="24" min="1"></div>
+          <hr>
+          <div class="card-hd" style="margin-top:.5rem"><h3>Default Access Tier</h3><span class="ctag tp">New Users</span></div>
+          <div style="font-size:.72rem;color:var(--t3);margin-bottom:.4rem">When admin grants access, default to:</div>
+          <div class="adm-tier" id="set-tier">
+            <button onclick="SETTINGS.setTier('trial')" id="set-trial-btn">Trial (7 days)</button>
+            <button onclick="SETTINGS.setTier('1year')" id="set-1year-btn" class="sel">1 Year</button>
+            <button onclick="SETTINGS.setTier('permanent')" id="set-perm-btn">Permanent</button>
+          </div>
+          <hr>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem">
+            <button class="btn" style="width:auto;padding:.6rem 1.2rem" onclick="SETTINGS.save()">💾 Save Settings</button>
+            <button class="btn-s btn-r" onclick="ADMIN.changePassword()">🔐 Change Admin Password</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REVIEW MODAL -->
+<div class="mbg" id="mbg-review" onclick="MODAL.close('review')">
+  <div class="mbox" onclick="event.stopPropagation()">
+    <div class="mhd"><h3 id="mtitle-review">Review Payment</h3><button class="mcl" onclick="MODAL.close('review')">✕</button></div>
+    <div class="mbody" id="mbody-review"></div>
+  </div>
+</div>
+
+<!-- USER DETAIL MODAL -->
+<div class="mbg" id="mbg-user" onclick="MODAL.close('user')">
+  <div class="mbox wide" onclick="event.stopPropagation()">
+    <div class="mhd"><h3 id="mtitle-user">User Details</h3><button class="mcl" onclick="MODAL.close('user')">✕</button></div>
+    <div class="mbody" id="mbody-user"></div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div class="mbg" id="mbg-pwd" onclick="MODAL.close('pwd')">
+  <div class="mbox" onclick="event.stopPropagation()">
+    <div class="mhd"><h3>Change Admin Password</h3><button class="mcl" onclick="MODAL.close('pwd')">✕</button></div>
+    <div class="mbody">
+      <div class="sf"><label>Current Password</label><input type="password" id="pwd-current" placeholder="••••••••"></div>
+      <div class="sf"><label>New Password</label><input type="password" id="pwd-new" placeholder="Min 6 characters"></div>
+      <div class="sf"><label>Confirm New Password</label><input type="password" id="pwd-confirm" placeholder="••••••••"></div>
+      <div style="display:flex;gap:.4rem;margin-top:.5rem">
+        <button class="btn-s btn-g" style="flex:1" onclick="ADMIN.doChangePassword()">Save New Password</button>
+        <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="MODAL.close('pwd')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIGURATION — Replace with your GAS Web App URL
+// ═══════════════════════════════════════════════════════════════
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwAhfyQm7NvxaNjgRm3oC9SdKwrfKNfjgDd-J0nYjYAhsU1d2PP2JfyMI30ol9AGSatyg/exec";
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN CORE
+// ═══════════════════════════════════════════════════════════════
+const ADMIN = {
+  creds: null,
+  data: {users:[], payments:[], settings:{}, logs:[]},
+  state: {uPage:1, pPage:1, lPage:1, uPerPage:15, pPerPage:15, lPerPage:20},
+
+  init() {
+    const saved = localStorage.getItem('hau_admin');
+    if (saved) {
+      try {
+        this.creds = JSON.parse(saved);
+        this.unlock();
+        return;
+      } catch(e) { localStorage.removeItem('hau_admin'); }
+    }
+  },
+
+  async login() {
+    const u = document.getElementById('ad-user').value.trim();
+    const p = document.getElementById('ad-pass').value;
+    if (!u || !p) return this.showErr('Enter admin credentials.');
+    if (p.length < 4) return this.showErr('Password too short.');
+    this.setLoading(true);
+    try {
+      const res = await this.post('adminLogin', {username:u, password:p});
+      if (!res.success) throw new Error(res.error || 'Invalid credentials');
+      this.creds = {user: u, token: res.adminToken, expires: Date.now() + 86400000};
+      localStorage.setItem('hau_admin', JSON.stringify(this.creds));
+      this.unlock();
+      this.toast('✅ Welcome to Admin World');
+    } catch(e) { this.showErr(e.message || 'Login failed. Check connection.'); }
+    this.setLoading(false);
+  },
+
+  unlock() {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').classList.add('on');
+    document.getElementById('admin-name').textContent = this.creds?.user || 'admin';
+    this.refresh();
+  },
+
+  logout() {
+    localStorage.removeItem('hau_admin');
+    localStorage.removeItem('hau_session');
+    location.href = 'index.html';
+  },
+
+  setLoading(on) {
+    const b = document.getElementById('btn-login');
+    b.disabled = on;
+    b.innerHTML = on ? '<span class="spin"></span>Verifying…' : 'Enter Admin Panel →';
+  },
+
+  showErr(msg) {
+    const e = document.getElementById('err');
+    e.textContent = msg; e.classList.add('show');
+    setTimeout(() => e.classList.remove('show'), 4000);
+  },
+
+  // SECURE: POST with JSON body
+  async post(action, params={}) {
+    const body = {action, ...params, adminToken: this.creds?.token};
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error('Network error: ' + r.status);
+    return await r.json();
+  },
+
+  async refresh() {
+    this.showLoading('Refreshing data…');
+    try {
+      const [stats, users, payments, settings, logs] = await Promise.all([
+        this.post('adminStats'),
+        this.post('adminListUsers'),
+        this.post('adminListPayments'),
+        this.post('getSettings'),
+        this.post('adminListLogs').catch(() => ({success:false, logs:[]}))
+      ]);
+      if (stats.success) this.renderStats(stats.stats);
+      if (users.success) { this.data.users = users.users; USERS.render(); }
+      if (payments.success) { this.data.payments = payments.payments; PAYMENTS.render(); }
+      if (settings.success) { this.data.settings = settings.settings; SETTINGS.load(); }
+      if (logs.success) { this.data.logs = logs.logs; LOGS.render(); }
+      this.toast('✅ Data refreshed');
+    } catch(e) { this.toast('❌ Refresh failed: ' + e.message); }
+    this.hideLoading();
+  },
+
+  renderStats(s) {
+    const set = (id,v) => {
+      const el = document.getElementById(id);
+      if(el) el.textContent = (v ?? 0).toLocaleString();
+    };
+    set('st-users', s.users?.total);
+    set('st-trial', s.users?.trial);
+    set('st-active', s.users?.active);
+    set('st-expired', s.users?.expired);
+    set('st-pending', s.users?.paymentPending);
+    set('st-payments', s.payments?.total);
+    set('st-verified', s.payments?.verified);
+    set('st-rejected', s.payments?.rejected);
+    // Sidebar badges
+    const sbu = document.getElementById('sb-users');
+    const sbp = document.getElementById('sb-payments');
+    if(sbu) sbu.textContent = s.users?.total ?? 0;
+    if(sbp) sbp.textContent = s.payments?.pending ?? 0;
+  },
+
+  showLoading(text='Loading…') {
+    document.getElementById('ld-text').textContent = text;
+    document.getElementById('ld-overlay').classList.add('show');
+  },
+  hideLoading() {
+    document.getElementById('ld-overlay').classList.remove('show');
+  },
+
+  toast(msg, duration=3000) {
+    const box = document.getElementById('toasts');
+    const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+    box.appendChild(t); setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),220)},duration);
+  },
+
+  exportUsers() {
+    const rows = ADMIN.data.users;
+    if (!rows.length) return this.toast('No users to export');
+    const headers = ['Username','Name','Email','Mobile','Status','Access Tier','Created'];
+    const csv = [headers.join(',')];
+    rows.forEach(u => {
+      const tier = u.accessTier || (u.permanentAccess ? 'permanent' : u.status);
+      csv.push([u.username, u.name||'', u.email||'', u.mobile||'', u.status, tier, u.createdAt||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    });
+    this.downloadCSV(csv.join('\n'), 'users_export.csv');
+  },
+
+  exportPayments() {
+    const rows = ADMIN.data.payments;
+    if (!rows.length) return this.toast('No payments to export');
+    const headers = ['Username','Name','TXN ID','Amount','Status','Submitted','Remarks'];
+    const csv = [headers.join(',')];
+    rows.forEach(p => {
+      csv.push([p.username, p.name||'', p.txId, ADMIN.data.settings.paymentAmount||100, p.status, p.submittedAt||'', p.remarks||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    });
+    this.downloadCSV(csv.join('\n'), 'payments_export.csv');
+  },
+
+  downloadCSV(content, filename) {
+    const blob = new Blob([content], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    this.toast('📥 Downloaded ' + filename);
+  },
+
+  changePassword() {
+    document.getElementById('pwd-current').value = '';
+    document.getElementById('pwd-new').value = '';
+    document.getElementById('pwd-confirm').value = '';
+    document.getElementById('mbg-pwd').classList.add('show');
+  },
+
+  async doChangePassword() {
+    const current = document.getElementById('pwd-current').value;
+    const newPass = document.getElementById('pwd-new').value;
+    const confirm = document.getElementById('pwd-confirm').value;
+    if (!current || !newPass) return ADMIN.toast('❌ Fill all fields');
+    if (newPass.length < 6) return ADMIN.toast('❌ Password must be 6+ chars');
+    if (newPass !== confirm) return ADMIN.toast('❌ Passwords do not match');
+    try {
+      const res = await ADMIN.post('adminChangePassword', {currentPassword: current, newPassword: newPass});
+      if (res.success) {
+        ADMIN.toast('✅ Password changed. Please re-login.');
+        setTimeout(() => ADMIN.logout(), 2000);
+      } else throw new Error(res.error);
+    } catch(e) { ADMIN.toast('❌ ' + e.message); }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// UI NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+const UI = {
+  nav(id) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+    const view = document.getElementById('view-' + id);
+    if(view) view.classList.add('on');
+    document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+    const el = document.getElementById('nav-' + id); if(el) el.classList.add('active');
+    this.sidebarClose();
+  },
+  sidebarOpen() { 
+    document.getElementById('sb').classList.add('open'); 
+    document.getElementById('ov').classList.add('show'); 
+  },
+  sidebarClose() { 
+    document.getElementById('sb').classList.remove('open'); 
+    document.getElementById('ov').classList.remove('show'); 
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// PAGINATION HELPER
+// ═══════════════════════════════════════════════════════════════
+const PAGINATION = {
+  render(containerId, current, total, callback) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (total <= 1) { el.innerHTML = ''; return; }
+    let html = '';
+    html += `<button ${current===1?'disabled':''} onclick="${callback}(${current-1})">←</button>`;
+    for (let i=1; i<=total; i++) {
+      if (i===1 || i===total || (i>=current-1 && i<=current+1)) {
+        html += `<button class="${i===current?'on':''}" onclick="${callback}(${i})">${i}</button>`;
+      } else if (i===current-2 || i===current+2) {
+        html += `<span style="color:var(--t3);font-size:.7rem">…</span>`;
+      }
+    }
+    html += `<button ${current===total?'disabled':''} onclick="${callback}(${current+1})">→</button>`;
+    html += `<span class="pg-info">Page ${current} of ${total}</span>`;
+    el.innerHTML = html;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// USERS MODULE — with 1-year access tier (Feature #5)
+// ═══════════════════════════════════════════════════════════════
+const USERS = {
+  selected: new Set(),
+  debounceTimer: null,
+
+  debouncedFilter() {
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => this.filter(), 300);
+  },
+
+  filterBy(status) {
+    const el = document.getElementById('u-filter');
+    if(el) el.value = status;
+    UI.nav('users');
+    this.filter();
+  },
+
+  filter() {
+    const qEl = document.getElementById('u-search');
+    const fEl = document.getElementById('u-filter');
+    const q = qEl ? qEl.value.toLowerCase() : '';
+    const f = fEl ? fEl.value : 'all';
+    const rows = ADMIN.data.users.filter(u => {
+      const match = !q || (u.username||'').toLowerCase().includes(q) || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+      const status = f==='all' ? true : u.status===f;
+      return match && status;
+    });
+    this.renderPage(rows);
+  },
+
+  render() { this.filter(); },
+
+  renderPage(rows) {
+    const perPage = ADMIN.state.uPerPage;
+    const totalPages = Math.ceil(rows.length / perPage) || 1;
+    if (ADMIN.state.uPage > totalPages) ADMIN.state.uPage = totalPages;
+    const start = (ADMIN.state.uPage - 1) * perPage;
+    const pageRows = rows.slice(start, start + perPage);
+    const tb = document.getElementById('users-body');
+    if (!tb) return;
+    if (!pageRows.length) { 
+      tb.innerHTML = '<tr><td colspan="7" class="empty"><div class="empty-i">📭</div><p>No users found</p></td></tr>'; 
+      const pg = document.getElementById('u-pg');
+      if(pg) pg.innerHTML = '';
+      return; 
+    }
+    tb.innerHTML = pageRows.map(u => {
+      const badge = u.status==='trial'?'badge-trial':u.status==='active'?'badge-active':u.status==='expired'?'badge-expired':u.status==='payment_pending'?'badge-pending':'badge-rejected';
+      const tier = u.accessTier || (u.permanentAccess ? 'permanent' : u.status==='trial' ? 'trial' : 'active');
+      const tierBadge = tier==='1year'?'badge-1year':tier==='permanent'?'badge-active':tier==='trial'?'badge-trial':'badge-pending';
+      const checked = this.selected.has(u.username) ? 'checked' : '';
+      return `<tr>
+        <td><input type="checkbox" class="chk" ${checked} onchange="USERS.toggle('${u.username}')"></td>
+        <td><div style="font-weight:600;color:var(--t1);cursor:pointer" onclick="USERS.view('${u.username}')">${u.name||u.username}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${u.username}</div></td>
+        <td><div style="font-size:.72rem">${u.email||'—'}</div><div style="font-size:.68rem;color:var(--t3)">${u.mobile||'—'}</div></td>
+        <td><span class="badge ${badge}">${u.status}</span></td>
+        <td><span class="badge ${tierBadge}">${tier}</span></td>
+        <td class="mono" style="font-size:.68rem">${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
+        <td style="text-align:right">
+          <button class="btn-s btn-c btn-sm" onclick="USERS.view('${u.username}')" title="View Details">👁</button>
+          <button class="btn-s btn-a btn-sm" onclick="USERS.edit('${u.username}')" title="Edit User">✏️</button>
+          <button class="btn-s btn-r btn-sm" onclick="USERS.del('${u.username}')" title="Delete">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    PAGINATION.render('u-pg', ADMIN.state.uPage, totalPages, 'USERS.goPage');
+  },
+
+  goPage(p) { ADMIN.state.uPage = p; this.filter(); },
+
+  toggle(username) {
+    if (this.selected.has(username)) this.selected.delete(username);
+    else this.selected.add(username);
+  },
+
+  toggleAll() {
+    const chk = document.getElementById('u-chk-all');
+    if(!chk) return;
+    const all = chk.checked;
+    const qEl = document.getElementById('u-search');
+    const fEl = document.getElementById('u-filter');
+    const q = qEl ? qEl.value.toLowerCase() : '';
+    const f = fEl ? fEl.value : 'all';
+    const rows = ADMIN.data.users.filter(u => {
+      const match = !q || (u.username||'').toLowerCase().includes(q) || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+      const status = f==='all' ? true : u.status===f;
+      return match && status;
+    });
+    rows.forEach(u => all ? this.selected.add(u.username) : this.selected.delete(u.username));
+    this.filter();
+  },
+
+  view(username) {
+    const u = ADMIN.data.users.find(x => x.username === username);
+    if (!u) return;
+    const badge = u.status==='trial'?'badge-trial':u.status==='active'?'badge-active':u.status==='expired'?'badge-expired':u.status==='payment_pending'?'badge-pending':'badge-rejected';
+    const tier = u.accessTier || (u.permanentAccess ? 'permanent' : u.status==='trial' ? 'trial' : 'active');
+    const pay = ADMIN.data.payments.find(p => p.username === username);
+    const mtitle = document.getElementById('mtitle-user');
+    const mbody = document.getElementById('mbody-user');
+    if(mtitle) mtitle.textContent = 'User: ' + (u.name || u.username);
+    if(mbody) mbody.innerHTML = `
+      <div class="dgrid" style="margin-bottom:.8rem">
+        <div class="ditem"><label>Username</label><val class="mono">${u.username}</val></div>
+        <div class="ditem"><label>Full Name</label><val>${u.name || '—'}</val></div>
+        <div class="ditem"><label>Email</label><val>${u.email || '—'}</val></div>
+        <div class="ditem"><label>Mobile</label><val>${u.mobile || '—'}</val></div>
+        <div class="ditem"><label>Status</label><val><span class="badge ${badge}">${u.status}</span></val></div>
+        <div class="ditem"><label>Access Tier</label><val><span class="badge ${tier==='1year'?'badge-1year':tier==='permanent'?'badge-active':'badge-trial'}">${tier}</span></val></div>
+        <div class="ditem"><label>Created</label><val>${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</val></div>
+        <div class="ditem"><label>Trial Expires</label><val>${u.trialExpiresAt ? new Date(u.trialExpiresAt).toLocaleString() : '—'}</val></div>
+      </div>
+      ${pay ? `<div style="background:var(--b0);border-radius:var(--r1);padding:.6rem;border:1px solid var(--b1);margin-bottom:.8rem">
+        <div style="font-size:.62rem;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-bottom:.3rem">Payment Info</div>
+        <div style="font-size:.78rem">TXN ID: <span class="mono">${pay.txId}</span></div>
+        <div style="font-size:.78rem">Status: <span class="badge ${pay.status==='pending'?'badge-pending':pay.status==='verified'?'badge-verified':'badge-rejected'}">${pay.status}</span></div>
+        ${pay.remarks ? `<div style="font-size:.76rem;color:var(--t3);margin-top:.2rem">Remarks: ${pay.remarks}</div>` : ''}
+        ${pay.screenshotUrl ? `<a href="${pay.screenshotUrl}" target="_blank" style="color:var(--sky);font-size:.76rem">View Screenshot →</a>` : ''}
+      </div>` : '<div style="font-size:.76rem;color:var(--t3);margin-bottom:.8rem">No payment record found.</div>'}
+      <div style="display:flex;gap:.4rem">
+        <button class="btn-s btn-a" onclick="MODAL.close('user'); USERS.edit('${u.username}')">✏️ Edit User</button>
+        <button class="btn-s btn-r" onclick="MODAL.close('user'); USERS.del('${u.username}')">🗑 Delete</button>
+        <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="MODAL.close('user')">Close</button>
+      </div>
+    `;
+    const mbg = document.getElementById('mbg-user');
+    if(mbg) mbg.classList.add('show');
+  },
+
+  edit(username) {
+    const u = ADMIN.data.users.find(x => x.username === username);
+    if (!u) return;
+    const mtitle = document.getElementById('mtitle-user');
+    const mbody = document.getElementById('mbody-user');
+    if(mtitle) mtitle.textContent = 'Edit User: ' + username;
+    if(mbody) mbody.innerHTML = `
+      <div class="sf"><label>Full Name</label><input type="text" id="edit-name" value="${u.name||''}"></div>
+      <div class="sf"><label>Email</label><input type="email" id="edit-email" value="${u.email||''}"></div>
+      <div class="sf"><label>Mobile</label><input type="text" id="edit-mobile" value="${u.mobile||''}"></div>
+      <div class="sf"><label>Status</label>
+        <select id="edit-status">
+          <option value="trial" ${u.status==='trial'?'selected':''}>Trial</option>
+          <option value="active" ${u.status==='active'?'selected':''}>Active</option>
+          <option value="expired" ${u.status==='expired'?'selected':''}>Expired</option>
+          <option value="payment_pending" ${u.status==='payment_pending'?'selected':''}>Pending Pay</option>
+          <option value="rejected" ${u.status==='rejected'?'selected':''}>Rejected</option>
+        </select>
+      </div>
+      <div class="sf"><label>Access Tier</label>
+        <div class="adm-tier">
+          <button onclick="USERS.setEditTier('trial')" id="edit-tier-trial" ${(u.accessTier||'')==='trial'?'class="sel"':''}>Trial</button>
+          <button onclick="USERS.setEditTier('1year')" id="edit-tier-1year" ${(u.accessTier||'')==='1year'?'class="sel"':''}>1 Year</button>
+          <button onclick="USERS.setEditTier('permanent')" id="edit-tier-perm" ${(u.accessTier||'')==='permanent'||u.permanentAccess?'class="sel"':''}>Permanent</button>
+        </div>
+      </div>
+      <div class="sf"><label>Reset Password (leave blank to keep)</label><input type="text" id="edit-password" placeholder="New password…"></div>
+      <div style="display:flex;gap:.4rem;margin-top:.5rem">
+        <button class="btn-s btn-g" style="flex:1" onclick="USERS.saveEdit('${username}')">💾 Save Changes</button>
+        <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="MODAL.close('user')">Cancel</button>
+      </div>
+    `;
+    this._editTier = u.accessTier || (u.permanentAccess ? 'permanent' : 'trial');
+    const mbg = document.getElementById('mbg-user');
+    if(mbg) mbg.classList.add('show');
+  },
+
+  _editTier: 'trial',
+  setEditTier(t) {
+    this._editTier = t;
+    document.querySelectorAll('.adm-tier button').forEach(b => b.classList.remove('sel'));
+    const btn = document.getElementById('edit-tier-' + (t==='1year'?'1year':t==='permanent'?'perm':'trial'));
+    if(btn) btn.classList.add('sel');
+  },
+
+  async saveEdit(username) {
+    const nameEl = document.getElementById('edit-name');
+    const emailEl = document.getElementById('edit-email');
+    const mobileEl = document.getElementById('edit-mobile');
+    const statusEl = document.getElementById('edit-status');
+    const pwdEl = document.getElementById('edit-password');
+    const updates = {
+      name: nameEl ? nameEl.value.trim() : '',
+      email: emailEl ? emailEl.value.trim() : '',
+      mobile: mobileEl ? mobileEl.value.trim() : '',
+      status: statusEl ? statusEl.value : 'trial',
+      accessTier: this._editTier,
+      permanentAccess: this._editTier === 'permanent',
+      password: pwdEl ? pwdEl.value : ''
+    };
+    try {
+      const res = await ADMIN.post('adminUpdateUser', {username, ...updates});
+      if (res.success) { 
+        ADMIN.toast('✅ User updated'); 
+        MODAL.close('user');
+        ADMIN.refresh(); 
+      } else throw new Error(res.error);
+    } catch(e) { ADMIN.toast('❌ ' + e.message); }
+  },
+
+  async del(username) {
+    if (!confirm('Delete user "' + username + '"? This cannot be undone.\n\nAll associated data (payments, progress) will also be deleted.')) return;
+    ADMIN.showLoading('Deleting user…');
+    try {
+      const res = await ADMIN.post('adminDeleteUser', {username});
+      if (res.success) { ADMIN.toast('✅ Deleted ' + username); ADMIN.refresh(); }
+      else throw new Error(res.error);
+    } catch(e) { ADMIN.toast('❌ ' + e.message); }
+    ADMIN.hideLoading();
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// PAYMENTS MODULE
+// ═══════════════════════════════════════════════════════════════
+const PAYMENTS = {
+  selected: new Set(),
+  debounceTimer: null,
+
+  debouncedFilter() {
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => this.filter(), 300);
+  },
+
+  filterBy(status) {
+    const el = document.getElementById('p-filter');
+    if(el) el.value = status;
+    UI.nav('payments');
+    this.filter();
+  },
+
+  filter() {
+    const qEl = document.getElementById('p-search');
+    const fEl = document.getElementById('p-filter');
+    const q = qEl ? qEl.value.toLowerCase() : '';
+    const f = fEl ? fEl.value : 'all';
+    const rows = ADMIN.data.payments.filter(p => {
+      const match = !q || (p.username||'').toLowerCase().includes(q) || (p.txId||'').toLowerCase().includes(q);
+      const status = f==='all' ? true : p.status===f;
+      return match && status;
+    });
+    this.renderPage(rows);
+    this.updateBulkBar();
+  },
+
+  render() { this.filter(); },
+
+  renderPage(rows) {
+    const perPage = ADMIN.state.pPerPage;
+    const totalPages = Math.ceil(rows.length / perPage) || 1;
+    if (ADMIN.state.pPage > totalPages) ADMIN.state.pPage = totalPages;
+    const start = (ADMIN.state.pPage - 1) * perPage;
+    const pageRows = rows.slice(start, start + perPage);
+    const tb = document.getElementById('payments-body');
+    if (!tb) return;
+    if (!pageRows.length) { 
+      tb.innerHTML = '<tr><td colspan="7" class="empty"><div class="empty-i">📭</div><p>No payments found</p></td></tr>'; 
+      const pg = document.getElementById('p-pg');
+      if(pg) pg.innerHTML = '';
+      return; 
+    }
+    tb.innerHTML = pageRows.map(p => {
+      const badge = p.status==='pending'?'badge-pending':p.status==='verified'?'badge-verified':'badge-rejected';
+      const checked = this.selected.has(p.username) ? 'checked' : '';
+      return `<tr>
+        <td><input type="checkbox" class="chk" ${checked} onchange="PAYMENTS.toggle('${p.username}')"></td>
+        <td><div style="font-weight:600;color:var(--t1)">${p.name||p.username}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${p.username}</div></td>
+        <td class="mono">${p.txId}</td>
+        <td style="font-size:.72rem">Rs ${ADMIN.data.settings.paymentAmount||'100'}</td>
+        <td><span class="badge ${badge}">${p.status}</span></td>
+        <td class="mono" style="font-size:.68rem">${p.submittedAt ? new Date(p.submittedAt).toLocaleDateString() : '—'}</td>
+        <td style="text-align:right">
+          ${p.status==='pending' ? `<button class="btn-s btn-g btn-sm" onclick="PAYMENTS.review('${p.username}')">✓ Verify</button> <button class="btn-s btn-r btn-sm" onclick="PAYMENTS.reject('${p.username}')">✕ Reject</button>` : '<span style="font-size:.68rem;color:var(--t3)">Reviewed</span>'}
+          <button class="btn-s btn-r btn-sm" style="margin-left:.2rem" onclick="PAYMENTS.del('${p.username}')">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    PAGINATION.render('p-pg', ADMIN.state.pPage, totalPages, 'PAYMENTS.goPage');
+  },
+
+  goPage(p) { ADMIN.state.pPage = p; this.filter(); },
+
+  toggle(username) {
+    if (this.selected.has(username)) this.selected.delete(username);
+    else this.selected.add(username);
+    this.updateBulkBar();
+  },
+
+  toggleAll() {
+    const chk = document.getElementById('p-chk-all');
+    if(!chk) return;
+    const all = chk.checked;
+    const qEl = document.getElementById('p-search');
+    const fEl = document.getElementById('p-filter');
+    const q = qEl ? qEl.value.toLowerCase() : '';
+    const f = fEl ? fEl.value : 'all';
+    const rows = ADMIN.data.payments.filter(p => {
+      const match = !q || (p.username||'').toLowerCase().includes(q) || (p.txId||'').toLowerCase().includes(q);
+      const status = f==='all' ? true : p.status===f;
+      return match && status;
+    });
+    rows.forEach(p => all ? this.selected.add(p.username) : this.selected.delete(p.username));
+    this.updateBulkBar();
+    this.filter();
+  },
+
+  updateBulkBar() {
+    const bar = document.getElementById('p-bulk');
+    const countEl = document.getElementById('p-bulk-count');
+    const count = this.selected.size;
+    if(countEl) countEl.textContent = count + ' selected';
+    if(bar) bar.classList.toggle('show', count > 0);
+  },
+
+  clearSelection() {
+    this.selected.clear();
+    const chk = document.getElementById('p-chk-all');
+    if(chk) chk.checked = false;
+    this.updateBulkBar();
+    this.filter();
+  },
+
+  async bulkVerify() {
+    if (!this.selected.size) return;
+    if (!confirm('Verify ' + this.selected.size + ' payment(s)?')) return;
+    ADMIN.showLoading('Verifying payments…');
+    let success = 0, failed = 0;
+    for (const username of this.selected) {
+      try {
+        const res = await ADMIN.post('adminReviewPayment', {username, status:'verified'});
+        if (res.success) success++; else failed++;
+      } catch(e) { failed++; }
+    }
+    ADMIN.hideLoading();
+    ADMIN.toast('✅ ' + success + ' verified' + (failed ? ', ❌ ' + failed + ' failed' : ''));
+    this.clearSelection();
+    ADMIN.refresh();
+  },
+
+  async bulkReject() {
+    if (!this.selected.size) return;
+    const reason = prompt('Rejection reason for ' + this.selected.size + ' payment(s):');
+    if (reason === null) return;
+    ADMIN.showLoading('Rejecting payments…');
+    let success = 0, failed = 0;
+    for (const username of this.selected) {
+      try {
+        const res = await ADMIN.post('adminReviewPayment', {username, status:'rejected', rejectionReason: reason});
+        if (res.success) success++; else failed++;
+      } catch(e) { failed++; }
+    }
+    ADMIN.hideLoading();
+    ADMIN.toast('✅ ' + success + ' rejected' + (failed ? ', ❌ ' + failed + ' failed' : ''));
+    this.clearSelection();
+    ADMIN.refresh();
+  },
+
+  review(username) { MODAL.openReview(username, 'verified'); },
+  reject(username) { MODAL.openReview(username, 'rejected'); },
+
+  async del(username) {
+    if (!confirm('Delete payment record for "' + username + '"?')) return;
+    ADMIN.showLoading('Deleting…');
+    try {
+      const res = await ADMIN.post('adminDeletePayment', {username});
+      if (res.success) { ADMIN.toast('✅ Deleted'); ADMIN.refresh(); }
+      else throw new Error(res.error);
+    } catch(e) { ADMIN.toast('❌ ' + e.message); }
+    ADMIN.hideLoading();
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL SYSTEM
+// ═══════════════════════════════════════════════════════════════
+const MODAL = {
+  openReview(username, action) {
+    const p = ADMIN.data.payments.find(x => x.username === username);
+    if (!p) return;
+    const title = action==='verified' ? 'Verify Payment' : 'Reject Payment';
+    const mtitle = document.getElementById('mtitle-review');
+    const mbody = document.getElementById('mbody-review');
+    if(mtitle) mtitle.textContent = title;
+    if(mbody) mbody.innerHTML = `
+      <div style="margin-bottom:.8rem">
+        <div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">User</div>
+        <div style="font-weight:600">${p.name||p.username} <span class="mono" style="font-size:.72rem;color:var(--t3)">(${p.username})</span></div>
+      </div>
+      <div style="margin-bottom:.8rem">
+        <div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Transaction ID</div>
+        <div class="mono" style="font-weight:600">${p.txId}</div>
+      </div>
+      <div style="margin-bottom:.8rem">
+        <div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Remarks</div>
+        <div style="font-size:.8rem">${p.remarks||'—'}</div>
+      </div>
+      ${p.screenshotUrl ? `<div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Screenshot</div><a href="${p.screenshotUrl}" target="_blank" style="color:var(--sky);font-size:.78rem">View Screenshot →</a></div>` : ''}
+      ${action==='rejected' ? `<div class="sf" style="margin-bottom:.8rem"><label>Rejection Reason</label><input type="text" id="rej-reason" placeholder="Why are you rejecting this payment?"></div>` : ''}
+      <div style="display:flex;gap:.4rem">
+        <button class="btn-s ${action==='verified'?'btn-g':'btn-r'}" style="flex:1" onclick="MODAL.confirmReview('${username}', '${action}')">${action==='verified'?'✓ Confirm Verify':'✕ Confirm Reject'}</button>
+        <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="MODAL.close('review')">Cancel</button>
+      </div>
+    `;
+    const mbg = document.getElementById('mbg-review');
+    if(mbg) mbg.classList.add('show');
+  },
+
+  async confirmReview(username, status) {
+    const reasonEl = document.getElementById('rej-reason');
+    const reason = reasonEl ? reasonEl.value : '';
+    ADMIN.showLoading(status==='verified'?'Verifying…':'Rejecting…');
+    try {
+      const res = await ADMIN.post('adminReviewPayment', {username, status, rejectionReason: reason});
+      if (res.success) { 
+        ADMIN.toast(status==='verified'?'✅ Verified! User now has permanent access.':'✅ Rejected.'); 
+        MODAL.close('review'); 
+        ADMIN.refresh(); 
+      }
+      else throw new Error(res.error);
+    } catch(e) { ADMIN.toast('❌ ' + e.message); }
+    ADMIN.hideLoading();
+  },
+
+  close(name) { 
+    const mbg = document.getElementById('mbg-' + name);
+    if(mbg) mbg.classList.remove('show'); 
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS MODULE
+// ═══════════════════════════════════════════════════════════════
+const SETTINGS = {
+  _tier: '1year',
+
+  load() {
+    const s = ADMIN.data.settings;
+    const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+    setVal('set-name', s.appName);
+    setVal('set-qr', s.qrCodeUrl);
+    setVal('set-phone', s.contactPhone);
+    setVal('set-amount', s.paymentAmount);
+    setVal('set-inst', s.paymentInstructions);
+    setVal('set-trial', s.trialHours);
+    this._tier = s.defaultTier || '1year';
+    this.updateTierUI();
+  },
+
+  setTier(t) {
+    this._tier = t;
+    this.updateTierUI();
+  },
+
+  updateTierUI() {
+    document.querySelectorAll('#set-tier button').forEach(b => b.classList.remove('sel'));
+    const btn = document.getElementById('set-' + (this._tier==='1year'?'1year':this._tier==='permanent'?'perm':'trial') + '-btn');
+    if(btn) btn.classList.add('sel');
+  },
+
+  async save() {
+    const amountEl = document.getElementById('set-amount');
+    const trialEl = document.getElementById('set-trial');
+    const amount = amountEl ? parseInt(amountEl.value) : 0;
+    const trial = trialEl ? parseInt(trialEl.value) : 0;
+    if (isNaN(amount) || amount < 1) return ADMIN.toast('❌ Invalid payment amount');
+    if (isNaN(trial) || trial < 1) return ADMIN.toast('❌ Invalid trial hours');
+
+    const settings = [
+      {key:'appName', value: document.getElementById('set-name')?.value.trim() || ''},
+      {key:'qrCodeUrl', value: document.getElementById('set-qr')?.value.trim() || ''},
+      {key:'contactPhone', value: document.getElementById('set-phone')?.value.trim() || ''},
+      {key:'paymentAmount', value: amount},
+      {key:'paymentInstructions', value: document.getElementById('set-inst')?.value || ''},
+      {key:'trialHours', value: trial},
+      {key:'defaultTier', value: this._tier},
+    ];
+    ADMIN.showLoading('Saving settings…');
+    try {
+      const res = await ADMIN.post('adminUpdateSettingsBatch', {settings});
+      if (res.success) {
+        ADMIN.toast('✅ Settings saved');
+        ADMIN.refresh();
+      } else {
+        for (const s of settings) {
+          await ADMIN.post('adminUpdateSettings', {key: s.key, value: s.value});
+        }
+        ADMIN.toast('✅ Settings saved');
+        ADMIN.refresh();
+      }
+    } catch(e) { ADMIN.toast('❌ Save failed: ' + e.message); }
+    ADMIN.hideLoading();
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ACTIVITY LOGS MODULE
+// ═══════════════════════════════════════════════════════════════
+const LOGS = {
+  filter() {
+    const qEl = document.getElementById('l-search');
+    const fEl = document.getElementById('l-filter');
+    const q = qEl ? qEl.value.toLowerCase() : '';
+    const f = fEl ? fEl.value : 'all';
+    const rows = ADMIN.data.logs.filter(l => {
+      const match = !q || (l.admin||'').toLowerCase().includes(q) || (l.target||'').toLowerCase().includes(q) || (l.action||'').toLowerCase().includes(q);
+      const action = f==='all' ? true : (l.action||'').includes(f);
+      return match && action;
+    });
+    this.renderPage(rows);
+  },
+
+  render() { this.filter(); },
+
+  renderPage(rows) {
+    const perPage = ADMIN.state.lPerPage;
+    const totalPages = Math.ceil(rows.length / perPage) || 1;
+    if (ADMIN.state.lPage > totalPages) ADMIN.state.lPage = totalPages;
+    const start = (ADMIN.state.lPage - 1) * perPage;
+    const pageRows = rows.slice(start, start + perPage);
+    const el = document.getElementById('logs-list');
+    const empty = document.getElementById('logs-empty');
+    if (!pageRows.length) { 
+      if(el) el.innerHTML = ''; 
+      if(empty) empty.style.display = 'block';
+      const pg = document.getElementById('l-pg');
+      if(pg) pg.innerHTML = '';
+      return; 
+    }
+    if(empty) empty.style.display = 'none';
+    if(el) el.innerHTML = pageRows.map(l => {
+      const time = l.timestamp ? new Date(l.timestamp).toLocaleString() : '—';
+      return `<div class="log-item">
+        <div class="log-time">${time}</div>
+        <div><span class="log-action">${l.action||'Action'}</span> by <strong>${l.admin||'Unknown'}</strong>
+        ${l.target ? ' → <span class="mono">' + l.target + '</span>' : ''}
+        ${l.details ? '<div style="color:var(--t3);font-size:.7rem;margin-top:.15rem">' + l.details + '</div>' : ''}</div>
+      </div>`;
+    }).join('');
+    PAGINATION.render('l-pg', ADMIN.state.lPage, totalPages, 'LOGS.goPage');
+  },
+
+  goPage(p) { ADMIN.state.lPage = p; this.filter(); }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-REFRESH & INIT
+// ═══════════════════════════════════════════════════════════════
+console.log("[ADMIN] Initializing admin panel..."); ADMIN.init();
 
 // Auto-refresh every 60 seconds when tab is active
 setInterval(() => {
