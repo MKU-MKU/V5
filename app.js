@@ -1,31 +1,44 @@
 /* ═══════════════════════════════════════════════════════════════
-   APP.JS — HAMRO AFNAI Smart Study Hub  (v3.1 — fully patched)
-   ═══════════════════════════════════════════════════════════════ */
+   APP.JS — HAMRO AFNAI Smart Study Hub  (v3 — user.html only)
+   ───────────────────────────────────────────────────────────────
+   This file now assumes the person already signed in on index.html
+   (trial + payment model). It reads the session index.html wrote
+   to localStorage['hau_session'] (SAME key, SAME object shape as
+   index.html) and verifies it via the same `checkSession` backend
+   action index.html itself uses. There is no login/signup UI and
+   no admin panel here — those live in index.html and admin.html
+   respectively.
+
+   SECTIONS:
+     1. Config & constants        7. UI (routing/sidebar/theme)
+     2. App state (S)             8. SB / ON / LOC / PSY (start quiz)
+     3. Utility functions         9. REV (bookmarks/flagged/wrong)
+     4. AUTH (session gate only) 10. QUIZ engine
+     5. PWA                      11. HOME/PROG/DATA/CACHE/TT
+     6. (admin panel removed —   12. APP boot
+         see admin.html)
+═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════ 1. CONFIG & CONSTANTS ═══════════════ */
 const APP_CONFIG = {
+  // ⚠️ Must be the SAME deployed Apps Script URL as GAS_URL in index.html
+  // and admin.html (the trial+payment backend). All three files currently
+  // have the "YOUR_SCRIPT_ID" placeholder — replace it in all three at once.
   APPS_URL: "https://script.google.com/macros/s/AKfycbwAhfyQm7NvxaNjgRm3oC9SdKwrfKNfjgDd-J0nYjYAhsU1d2PP2JfyMI30ol9AGSatyg/exec",
 };
 const APPS = APP_CONFIG.APPS_URL;
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+// Optional labels for organizing Bookmarks — assign one per bookmarked question.
+const BK_TAGS = ['Formulae','Need Revision','Conflicting','Interesting','Need Correction'];
 const LS = {
+  // ⚠️ Must be the EXACT SAME key as index.html's localStorage.setItem('hau_session', ...).
+  // index.html is the only place that writes this key. Do not rename either side alone.
   USER:'hau_session',
   PROG:'ha_prog', BK:'ha_bk', FL:'ha_fl', WR:'ha_wr',
   QC:'ha_qc_', TT:'ha_tt', STK:'ha_stk',
   FORCED_OFFLINE:'ha_forced_off'
 };
-/* ═══════════════════════════════════════════════════════════════
-   DEPENDENCY CHECK — fail fast if chapters-data.js not loaded
-   ═══════════════════════════════════════════════════════════════ */
-if (typeof ChapterData === 'undefined') {
-  console.error('[HAMRO AFNAI] FATAL: chapters-data.js not loaded. Make sure it is included BEFORE app.js in your HTML.');
-  document.addEventListener('DOMContentLoaded', function() {
-    var err = document.getElementById('sg-txt');
-    if (err) err.textContent = 'Error: required data file not loaded.';
-  });
-}
-
 
 /* ═══════════════ 2. APP STATE ═══════════════ */
 const S = {
@@ -47,7 +60,6 @@ const S = {
 function _load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
 function _save(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{toast('⚠️ Storage full — some data not saved');return false}}
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function jsesc(s){return String(s||'').replace(/[\\'"]/g,function(m){return{'\\':'\\\\',"'":"\'",'"':'\"'}[m]})}
 function shuf(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
 function fmt(s){if(s<0)s=0;return`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -137,7 +149,22 @@ async function netFetch(url, opts, timeoutMs=20000){
   }
 }
 
-/* ═══════════════ 4. AUTH ═══════════════ */
+/* ═══════════════ 4. AUTH — SESSION GATE ONLY ═══════════════
+   No login/signup/admin here. index.html already handled sign-in,
+   the 24h trial, and payment verification, and only sends someone
+   to user.html once they have permanent OR trial access. This module
+   just: (a) trusts the cached localStorage['hau_session'] if we're
+   offline (as long as its access level still looks valid), and
+   (b) re-validates with the server's `checkSession` action if we're
+   online, exactly like index.html's own resumeUserSession() does.
+
+   The session object read/written here is the SAME shape index.html
+   uses — { type, username, name, email, mobile, token, access:{level,
+   trialExpiresAt, permanent}, settings, lastVerified } — not the raw
+   backend user row. If validation ever comes back expired/pending/
+   rejected, we bounce back to index.html so it can show the right
+   trial/payment/rejected state.
+═══════════════════════════════════════════════════════════════ */
 const AUTH = {
   async restore(){
     const u = _load(LS.USER, null);
@@ -145,11 +172,14 @@ const AUTH = {
       AUTH._bounce();
       return;
     }
+    // Offline (or forced offline): trust the cached session IF its access
+    // level still looks valid (permanent, or trial that hasn't expired yet).
     if(!S.online || S.forcedOffline){
       if(AUTH._isValidOffline(u)) AUTH._enter(u);
       else AUTH._bounce();
       return;
     }
+    // Online: re-validate against the server, same contract index.html uses.
     try{
       const r = await netFetch(`${APPS}?${qs({action:'checkSession', username:u.username})}`, {redirect:'follow'});
       const res = await r.json();
@@ -159,19 +189,29 @@ const AUTH = {
       if(updated.access.level === 'permanent' || updated.access.level === 'trial'){
         AUTH._enter(updated);
       } else {
+        // Expired, pending, or rejected — index.html owns that UI.
         AUTH._bounce();
       }
     }catch{
+      // Network hiccup — don't lock the person out if the cached session
+      // still looks valid; only bounce if it's genuinely stale/expired.
       if(AUTH._isValidOffline(u)) AUTH._enter(u);
       else AUTH._bounce();
     }
   },
+
+  // Same rule index.html itself uses to decide whether a cached session
+  // is still good enough to study offline.
   _isValidOffline(u){
     const a = u.access || {};
     if(a.level === 'permanent') return true;
     if(a.level === 'trial' && a.trialExpiresAt) return new Date(a.trialExpiresAt) > Date.now();
     return false;
   },
+
+  // Mirrors index.html's handleUserAuth() access-building logic exactly,
+  // so both files always agree on what "permanent / trial / expired /
+  // pending" means from the same checkSession response.
   _buildSession(prevSession, res){
     const user = res.user || {};
     const access = {
@@ -180,7 +220,9 @@ const AUTH = {
              : res.needsPayment ? 'expired'
              : 'pending',
       trialExpiresAt: res.trialExpiresAt || user.trialExpiresAt,
-      permanent: !!(res.permanentAccess || user.status === 'active')
+      permanent: !!(res.permanentAccess || user.status === 'active'),
+      accessType: res.accessType || user.accessType || 'permanent',
+      accessExpiresAt: res.accessExpiresAt || user.accessExpiresAt || ''
     };
     return {
       ...prevSession,
@@ -188,32 +230,51 @@ const AUTH = {
       name: user.name || prevSession.name,
       email: user.email || prevSession.email,
       mobile: user.mobile || prevSession.mobile,
-      role: user.role || prevSession.role || 'user',
       access,
       lastVerified: Date.now()
     };
   },
-  _bounce(){ window.location.href = 'index.html'; },
+
+  _bounce(){
+    window.location.href = 'index.html';
+  },
+
   _enter(user){
     S.user = user;
     document.getElementById('sg').style.display='none';
     document.getElementById('app').classList.add('on');
     document.getElementById('uchip').textContent = '👤 ' + (user?.name||user?.username||'Student');
+    AUTH._updateSidebarCard(user);
     if(!S.online) document.getElementById('offbar').classList.add('show');
-    if(user?.role === 'admin' && !document.getElementById('adm-btn')){
-      const adm = document.createElement('button');
-      adm.id = 'adm-btn'; adm.className = 'tb-btn amber'; adm.textContent = '👑';
-      adm.title = 'Admin Panel'; adm.onclick = () => ADMIN.open();
-      const tr = document.querySelector('.tb-r');
-      if(tr) tr.insertBefore(adm, tr.firstChild);
-    }
     APP.init();
   },
+
+  _updateSidebarCard(user){
+    const nameEl = document.getElementById('sb-uname');
+    const statusEl = document.getElementById('sb-ustatus');
+    if(nameEl) nameEl.textContent = user?.name || user?.username || 'Student';
+    if(statusEl){
+      const a = user?.access || {};
+      if(a.level==='permanent' && a.accessType==='yearly'){
+        statusEl.textContent = a.accessExpiresAt ? `📅 Access until ${new Date(a.accessExpiresAt).toLocaleDateString()}` : '📅 Yearly access';
+      } else if(a.level==='permanent'){
+        statusEl.textContent = '✅ Permanent access';
+      } else if(a.level==='trial'){
+        statusEl.textContent = a.trialExpiresAt ? `⏳ Trial until ${new Date(a.trialExpiresAt).toLocaleString()}` : '⏳ Trial access';
+      } else {
+        statusEl.textContent = '—';
+      }
+    }
+  },
+
   logout(){
     if(!confirm('Log out?'))return;
     localStorage.removeItem(LS.USER);
     window.location.href = 'index.html';
   },
+
+  /* Light periodic re-check so a revoked account, or a trial that just
+     ran out, doesn't keep studying indefinitely once back online. */
   _revalidateTimer:null,
   startPeriodicRecheck(){
     if(AUTH._revalidateTimer) clearInterval(AUTH._revalidateTimer);
@@ -231,10 +292,9 @@ const AUTH = {
             AUTH._bounce();
           }
         }
-      }catch{}
-    }, 10*60*1000);
-  },
-  init(){ return AUTH.restore(); }
+      }catch{ /* ignore — don't punish for a flaky connection */ }
+    }, 10*60*1000); // every 10 minutes
+  }
 };
 
 /* ═══════════════ 5. PWA ═══════════════ */
@@ -294,10 +354,6 @@ const UI = {
     }
     UI._goRaw(v);
   },
-  sidebarOpen(){
-    document.getElementById('sb').classList.add('open');
-    document.getElementById('ov').classList.add('show');
-  },
   sidebarToggle(){
     document.getElementById('sb').classList.toggle('open');
     document.getElementById('ov').classList.toggle('show');
@@ -312,42 +368,12 @@ const UI = {
   }
 };
 
-/* ═══════════════ 7a. SIDEBAR QUICK QUIZ ═══════════════ */
-const SB = {
-  onLv(){
-    const lv=document.getElementById('sb-lv').value;
-    const cs=document.getElementById('sb-ch');
-    cs.innerHTML='<option>Chapter…</option>';cs.disabled=!lv;
-    const ts=document.getElementById('sb-to');ts.innerHTML='<option>Subtopic…</option>';ts.disabled=true;
-    if(!lv)return;
-    Object.entries(ChapterData.chapters(lv)).forEach(([k,n])=>{
-      const o=document.createElement('option');o.value=k;o.textContent=`Ch${k}: ${n}`;cs.appendChild(o);
-    });
-  },
-  onCh(){
-    const lv=document.getElementById('sb-lv').value;
-    const ch=document.getElementById('sb-ch').value;
-    const ts=document.getElementById('sb-to');
-    ts.innerHTML='<option>Subtopic…</option>';ts.disabled=true;
-    const files=ChapterData.files(lv,ch);
-    if(!Object.keys(files).length){
-      ts.innerHTML='<option>No files yet</option>';
-      return;
-    }
-    Object.entries(files).forEach(([n,id])=>{
-      if(!id)return;
-      const o=document.createElement('option');o.value=id;o.dataset.key=`${lv}_${ch}_${n}`;o.textContent=n;ts.appendChild(o);
-    });
-    ts.disabled=false;
-  },
-  go(mode){
-    const ts=document.getElementById('sb-to');
-    const fid=ts.value,key=ts.options[ts.selectedIndex]?.dataset?.key;
-    const name=ts.options[ts.selectedIndex]?.textContent||'Sidebar';
-    if(!fid||!key){toast('Select a subtopic first');return}
-    QUIZ.load(fid,key,mode,name);
-  }
-};
+/* ═══════════════ 7a. (removed — Sidebar Quick Quiz) ═══════════════
+   The sidebar's own Level→Chapter→Subtopic picker was removed in
+   favor of the Online Study tab, which does the same job with a
+   fuller layout and offline-cache-aware options. If you ever want
+   a compact sidebar picker back, model it on the ON module below.
+═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════ 7b. ONLINE STUDY ═══════════════ */
 const ON = {
@@ -405,8 +431,7 @@ const ON = {
     const ch=document.getElementById('on-ch').value,lv=document.getElementById('on-lv').value;
     if(!fid||!key){toast('Select a subtopic');return}
     const name=ChapterData.chapterName(lv,ch);
-    const doShuffle = document.getElementById('on-shuf')?.classList.contains('on') ?? true;
-    QUIZ.load(fid,key,mode,name,doShuffle);
+    QUIZ.load(fid,key,mode,name);
   }
 };
 
@@ -432,8 +457,7 @@ const LOC = {
   },
   start(mode){
     if(!S.localQs){toast('Load a JSON file first');return}
-    const doShuffle = document.getElementById('loc-shuf')?.classList.contains('on') ?? true;
-    QUIZ.startWith([...S.localQs],mode,'Local File',doShuffle);
+    QUIZ.startWith([...S.localQs],mode,'Local File');
   }
 };
 
@@ -449,7 +473,7 @@ const PSY = {
         return `<div class="ch-item" onclick="this.querySelector('input').click()">
           <input type="checkbox" value="${k}" data-lv="${lv}" ${fc?'':'disabled'} onclick="event.stopPropagation();PSY._info()">
           <div class="ch-num">${k}</div>
-          <div class="ch-name">${n}${fc?'':' <span style="color:var(--t3)">(no files)</span>'}</div>
+          <div class="ch-name">${n}${fc?'':' <span style=\"color:var(--t3)\">(no files)</span>'}</div>
           <div class="ch-cnt">${fc}f</div>
         </div>`;
       }).join('');
@@ -495,8 +519,7 @@ const PSY = {
     QUIZ._hideLoader();
     if(!all.length){toast('❌ No questions loaded. Cache data first if offline.',5000);return}
     if(failed>0) toast(`⚠️ ${failed} file${failed>1?'s':''} failed to load — starting with ${all.length} questions`);
-    const doShuffle = document.getElementById('psy-shuf')?.classList.contains('on') ?? true;
-    let qsArr = doShuffle ? shuf(all) : [...all];
+    let qsArr=shuf(all);
     if(type==='exam')qsArr=qsArr.slice(0,100);
     if(type==='weak'){
       const wu=new Set(S.wr.map(w=>w.uid));
@@ -504,11 +527,11 @@ const PSY = {
       qsArr=weak.length?weak:qsArr.slice(0,50);
       if(!weak.length)toast('ℹ️ No wrong answers yet — showing 50 random instead');
     }
-    QUIZ.startWith(qsArr,type==='exam'?'exam':'flashcard','⚡ Psycho Mode',false);
+    QUIZ.startWith(qsArr,type==='exam'?'exam':'flashcard','⚡ Psycho Mode');
   }
 };
 
-/* ═══════════════ 8. REVIEW LISTS ═══════════════ */
+/* ═══════════════ 8. REVIEW LISTS (bookmarks / flagged / wrong) ═══════════════ */
 const REV = {
   _store(kind){ return kind==='bk'?S.bk : kind==='fl'?S.fl : S.wr; },
   _lsKey(kind){ return kind==='bk'?LS.BK : kind==='fl'?LS.FL : LS.WR; },
@@ -518,22 +541,46 @@ const REV = {
     const arr = REV._store(kind);
     const i = arr.findIndex(x=>x.uid===question.uid);
     if(i>-1){ arr.splice(i,1); toast(kind==='bk'?'⭐ Removed bookmark':'🚩 Removed flag'); }
-    else { arr.push(question); toast(kind==='bk'?'⭐ Bookmarked':'🚩 Flagged'); }
+    else { arr.push(kind==='bk' ? {...question, tag:''} : question); toast(kind==='bk'?'⭐ Bookmarked':'🚩 Flagged'); }
     _save(REV._lsKey(kind), arr);
     HOME.updateBadges();
     return i===-1;
   },
   has(kind, uid){ return REV._store(kind).some(x=>x.uid===uid); },
+  getTag(uid){ return S.bk.find(x=>x.uid===uid)?.tag || ''; },
+  setTag(uid, tag){
+    const item = S.bk.find(x=>x.uid===uid);
+    if(!item) return;
+    item.tag = tag;
+    _save(LS.BK, S.bk);
+    REV.renderList('bk');
+  },
 
   addWrong(question){
-    if(S.wr.some(x=>x.uid===question.uid))return;
-    S.wr.push(question);
+    const existing = S.wr.find(x=>x.uid===question.uid);
+    if(existing){ existing._streak = 0; _save(LS.WR, S.wr); HOME.updateBadges(); return; }
+    S.wr.push({...question, _streak:0});
     _save(LS.WR, S.wr);
     HOME.updateBadges();
   },
   removeWrong(uid){
     const i=S.wr.findIndex(x=>x.uid===uid);
     if(i>-1){ S.wr.splice(i,1); _save(LS.WR, S.wr); HOME.updateBadges(); }
+  },
+  // Call this instead of addWrong/removeWrong directly when scoring an
+  // answer — a question only leaves the Wrong Bank once it's been
+  // answered correctly two times in a row (a single lucky guess doesn't
+  // clear it).
+  trackAnswer(question, isCorrect){
+    if(isCorrect){
+      const item = S.wr.find(x=>x.uid===question.uid);
+      if(!item) return; // wasn't in the wrong bank, nothing to track
+      item._streak = (item._streak||0) + 1;
+      if(item._streak >= 2){ REV.removeWrong(question.uid); }
+      else { _save(LS.WR, S.wr); }
+    } else {
+      REV.addWrong(question);
+    }
   },
 
   renderList(kind){
@@ -549,20 +596,27 @@ const REV = {
         const c=String(j)===String(q.correct)||j===Number(q.correct);
         return `<div class="eo${c?' shc':''}">${String.fromCharCode(65+j)}) ${esc(o)}</div>`;
       }).join('');
+      const tagPicker = kind==='bk' ? `
+        <select class="sel-c" style="margin-top:.4rem;font-size:.7rem;padding:.25rem .4rem;width:auto" onchange="REV.setTag('${esc(q.uid||'')}', this.value)">
+          <option value="">🏷 No tag</option>
+          ${BK_TAGS.map(t=>`<option value="${t}" ${q.tag===t?'selected':''}>${t}</option>`).join('')}
+        </select>` : '';
       return `<div class="qcard" style="margin-bottom:.5rem">
         <div class="qm"><span class="qn mono">#${i+1}</span>
+          ${q.tag ? `<span class="ctag ta" style="margin-left:.3rem">🏷 ${esc(q.tag)}</span>` : ''}
           <button class="ib" onclick="REV._removeOne('${kind}','${esc(q.uid||'')}')">🗑</button>
         </div>
         <div class="qt" style="font-size:.82rem">${esc(q.q)}</div>
         <div style="margin-top:.3rem">${opts}</div>
         ${q.explanation?`<div class="expl show" style="margin-top:.45rem">${esc(q.explanation)}</div>`:''}
+        ${tagPicker}
       </div>`;
     }).join('');
   },
   _removeOne(kind, uid){
     const arr=REV._store(kind);
     const i=arr.findIndex(x=>x.uid===uid);
-    if(i>-1){arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();toast('\u{1F5D1} Removed');}
+    if(i>-1){arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();}
   },
   clearAll(kind){
     if(!confirm('Clear this whole list?'))return;
@@ -627,7 +681,7 @@ const QUIZ = {
     }
   },
 
-  async load(fileId, cacheKey, mode, chapterName, doShuffle=true){
+  async load(fileId, cacheKey, mode, chapterName){
     if(!S.online || S.forcedOffline){
       const ck = LS.QC + cacheKey;
       const cached = _load(ck, null);
@@ -650,14 +704,14 @@ const QUIZ = {
       const qsArr = normQ(raw, fileId);
       QUIZ._hideLoader();
       if(!qsArr.length){ toast('❌ No valid questions found in this file. Check the file format.'); return; }
-      QUIZ.startWith(qsArr, mode, chapterName, doShuffle);
+      QUIZ.startWith(qsArr, mode, chapterName);
     } catch(err){
       clearTimeout(msgTimer); clearTimeout(msgTimer2);
       QUIZ._hideLoader();
       const msg = err.message==='OFFLINE'
         ? 'You are offline and this set is not cached. Download it first from the Offline Cache tab.'
         : err.message;
-      QUIZ._showError(msg, ()=>QUIZ.load(fileId, cacheKey, mode, chapterName, doShuffle));
+      QUIZ._showError(msg, ()=>QUIZ.load(fileId, cacheKey, mode, chapterName));
     }
   },
 
@@ -706,17 +760,17 @@ const QUIZ = {
     if(el) el.style.display = 'none';
   },
 
-  startWith(qsArr, mode, chapterName, doShuffle=true){
+  startWith(qsArr, mode, chapterName){
     if(!qsArr || !qsArr.length){ toast('No questions to study'); return; }
     QUIZ._stopTimer();
     if(qsArr.length > 20){
-      QUIZ._showLimitPicker(qsArr, mode, chapterName, doShuffle);
+      QUIZ._showLimitPicker(qsArr, mode, chapterName);
       return;
     }
-    QUIZ._doStart(qsArr, mode, chapterName, doShuffle);
+    QUIZ._doStart(qsArr, mode, chapterName);
   },
 
-  _showLimitPicker(qsArr, mode, chapterName, doShuffle=true){
+  _showLimitPicker(qsArr, mode, chapterName){
     if(document.getElementById('quiz-limit-modal')) return;
     const total = qsArr.length;
     const presets = [10,20,30,50].filter(n=>n<total);
@@ -733,7 +787,11 @@ const QUIZ = {
           <button onclick="document.getElementById('qlm-inp').value=${total}" style="padding:.35rem .7rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.76rem;cursor:pointer;font-family:var(--ff)">All ${total}</button>
         </div>
         <input id="qlm-inp" type="number" min="1" max="${total}" value="${Math.min(20,total)}"
-          style="width:100%;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r2);padding:.5rem .75rem;color:var(--t1);font-size:.9rem;font-family:var(--ff);outline:none;box-sizing:border-box;margin-bottom:.75rem">
+          style="width:100%;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r2);padding:.5rem .75rem;color:var(--t1);font-size:.9rem;font-family:var(--ff);outline:none;box-sizing:border-box;margin-bottom:.6rem">
+        <label style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;cursor:pointer;font-size:.8rem;color:var(--t2)">
+          <input id="qlm-shuffle" type="checkbox" checked style="width:16px;height:16px;accent-color:var(--amb);cursor:pointer">
+          🔀 Shuffle question order
+        </label>
         <div style="display:flex;gap:.4rem">
           <button id="qlm-start" style="flex:1;padding:.62rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:#0F0A00;font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">Start →</button>
           <button onclick="document.getElementById('quiz-limit-modal').remove()" style="padding:.62rem .9rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-size:.83rem;cursor:pointer;font-family:var(--ff)">✕</button>
@@ -743,6 +801,7 @@ const QUIZ = {
     modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
     document.getElementById('qlm-start').onclick = ()=>{
       const n = Math.min(total, Math.max(1, parseInt(document.getElementById('qlm-inp').value)||total));
+      const doShuffle = document.getElementById('qlm-shuffle').checked;
       modal.remove();
       const picked = doShuffle ? shuf(qsArr).slice(0,n) : qsArr.slice(0,n);
       QUIZ._doStart(picked, mode, chapterName, false);
@@ -753,8 +812,7 @@ const QUIZ = {
     const modeLabel = mode==='exam' ? '📝 Exam' : '⚡ Flashcard';
     toast(`${modeLabel} — ${qsArr.length} question${qsArr.length!==1?'s':''} · ${chapterName||'Study'}`, 2500);
     S.quiz = {
-      qs: doShuffle ? shuf(qsArr) : [...qsArr],
-      ans: new Array(qsArr.length).fill(null),
+      qs: doShuffle ? shuf(qsArr) : [...qsArr], ans: new Array(qsArr.length).fill(null),
       mode, idx:0, timer:null, elapsed:0,
       left: mode==='exam' ? qsArr.length*90 : 0,
       active:true, ch: chapterName||'Study', skipped:new Set(), shown:new Set()
@@ -817,7 +875,9 @@ const QUIZ = {
   },
   _stopTimer(){ if(S.quiz.timer){ clearInterval(S.quiz.timer); S.quiz.timer=null; } },
 
-  quit(){ QUIZ._exitGuard(()=>{ UI._goRaw('home'); }); },
+  quit(){
+    QUIZ._exitGuard(()=>{ UI._goRaw('home'); });
+  },
 
   _exitGuard(afterQuit){
     if(document.getElementById('quiz-exit-modal')) return;
@@ -869,6 +929,10 @@ const QUIZ = {
       <button class="ib ${isStarred?'bk-on':''}" onclick="QUIZ._star()" title="Bookmark">⭐</button>
       <button class="ib ${isFlagged?'fl-on':''}" onclick="QUIZ._flag()" title="Flag">🚩</button>
       <button class="ib" onclick="SRCH.toggle()" title="Search (Ctrl+F)">🔍</button>
+      ${isStarred ? `<select class="sel-c" style="font-size:.68rem;padding:.2rem .35rem;width:auto" onchange="REV.setTag('${esc(q.uid||'')}', this.value)">
+        <option value="">🏷 Tag…</option>
+        ${BK_TAGS.map(t=>`<option value="${t}" ${REV.getTag(q.uid)===t?'selected':''}>${t}</option>`).join('')}
+      </select>` : ''}
     `;
 
     const ansIdx = S.quiz.ans[S.quiz.idx];
@@ -912,8 +976,8 @@ const QUIZ = {
     S.quiz.ans[S.quiz.idx]=i;
     const q=S.quiz.qs[S.quiz.idx];
     const correct=isOk(i,q.correct);
-    if(correct){ PROG.track(true); REV.removeWrong(q.uid); }
-    else { PROG.track(false); REV.addWrong(q); }
+    if(correct){ PROG.track(true); REV.trackAnswer(q, true); }
+    else { PROG.track(false); REV.trackAnswer(q, false); }
     QUIZ._renderFlashcard();
   },
   fcNav(dir){
@@ -988,17 +1052,19 @@ const QUIZ = {
       });
       const correctPick = isOk(S.quiz.ans[qi], q.correct);
       PROG.track(correctPick);
-      if(correctPick) REV.removeWrong(q.uid); else REV.addWrong(q);
+      REV.trackAnswer(q, correctPick);
     });
     QUIZ._showResults();
   },
 
+  /* ── RETRY ── */
   retryWrong(){
     const wrongIdx = S.quiz.qs.map((q,i)=>({q,i})).filter(({i})=>!isOk(S.quiz.ans[i], S.quiz.qs[i].correct));
     if(!wrongIdx.length){ toast('🎉 Nothing to retry — all correct!'); UI.go('home'); return; }
     QUIZ.startWith(wrongIdx.map(x=>x.q), 'flashcard', S.quiz.ch + ' (Retry)');
   },
 
+  /* ── RESULTS ── */
   _showResults(){
     document.getElementById('fc-wrap').style.display='none';
     document.getElementById('ex-wrap').style.display='none';
@@ -1056,23 +1122,15 @@ document.addEventListener('keydown', e=>{
       const i=Number(e.key)-1;
       if(S.quiz.qs[S.quiz.idx]?.options[i]!==undefined) QUIZ.fcAnswer(i);
     }
+    const letterIdx = 'abcdABCD'.indexOf(e.key);
+    if(letterIdx > -1){
+      const i = letterIdx % 4;
+      if(S.quiz.qs[S.quiz.idx]?.options[i]!==undefined) QUIZ.fcAnswer(i);
+    }
   }
 });
 
-/* global shortcuts */
-document.addEventListener('keydown', e=>{
-  if(S.quiz.active) return;
-  if(e.ctrlKey && e.key === '1'){ e.preventDefault(); UI.go('home'); }
-  if(e.ctrlKey && e.key === '2'){ e.preventDefault(); UI.go('online'); }
-  if(e.ctrlKey && e.key === '3'){ e.preventDefault(); UI.go('progress'); }
-  if(e.ctrlKey && e.key === 'r'){ e.preventDefault(); location.reload(); }
-  if(e.shiftKey && e.key === '?'){
-    e.preventDefault();
-    document.getElementById('shortcuts-modal').style.display = 'flex';
-  }
-});
-
-/* ═══════════════ 10a. PROGRESS ═══════════════ */
+/* ═══════════════ 10a. PROGRESS TRACKING ═══════════════ */
 const PROG = {
   track(correct){
     S.prog.total++;
@@ -1137,7 +1195,6 @@ const PROG = {
     }
   }
 };
-
 /* ═══════════════ 10b. STREAK ═══════════════ */
 const STREAK = {
   markToday(){
@@ -1176,7 +1233,7 @@ const STREAK = {
   }
 };
 
-/* ═══════════════ 10c. HOME ═══════════════ */
+/* ═══════════════ 10c. HOME / DASHBOARD ═══════════════ */
 const HOME = {
   render(){
     const h=new Date().getHours();
@@ -1206,6 +1263,12 @@ const HOME = {
   updateBadges(){
     const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
     set('bkc', S.bk.length); set('flc', S.fl.length); set('wrc', S.wr.length);
+    const total = S.bk.length + S.fl.length + S.wr.length;
+    const bnBadge = document.getElementById('bn-badge');
+    if(bnBadge){
+      if(total>0){ bnBadge.textContent = total>99?'99+':total; bnBadge.style.display=''; }
+      else { bnBadge.style.display='none'; }
+    }
   },
   renderRecent(){
     const el = document.getElementById('recent-sessions');
@@ -1241,12 +1304,10 @@ const TT = {
     const name=document.getElementById('tt-name').value.trim();
     const start=document.getElementById('tt-s').value;
     const end=document.getElementById('tt-e').value;
-    const recurring=document.getElementById('tt-recurring')?.checked||false;
     if(!name||!start||!end){ toast('Fill in all fields'); return; }
-    S.tt.sessions.push({id:Date.now()+'', day, name, start, end, recurring});
+    S.tt.sessions.push({id:Date.now()+'', day, name, start, end});
     _save(LS.TT, S.tt);
     document.getElementById('tt-name').value='';
-    document.getElementById('tt-recurring').checked=false;
     TT.render();
     toast('✅ Session added');
   },
@@ -1284,7 +1345,8 @@ const TT = {
     const weekEl = document.getElementById('tt-week');
     const todayIdx = new Date().getDay();
     weekEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:.5rem">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(78px,1fr));gap:4px;margin-bottom:.5rem;min-width:560px">
         ${DAYS.map((d,i)=>`
           <div style="text-align:center;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
             color:${i===todayIdx?'var(--neon)':'var(--t3)'};
@@ -1294,7 +1356,7 @@ const TT = {
           </div>
         `).join('')}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;align-items:start">
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(78px,1fr));gap:4px;align-items:start;min-width:560px">
         ${DAYS.map((d,di)=>{
           const sess = S.tt.sessions.filter(s=>s.day===di).sort((a,b)=>a.start.localeCompare(b.start));
           const isToday = di===todayIdx;
@@ -1309,6 +1371,7 @@ const TT = {
             `).join('') : `<div style="text-align:center;color:var(--t3);font-size:.6rem;margin-top:.5rem">—</div>`}
           </div>`;
         }).join('')}
+      </div>
       </div>
     `;
   },
@@ -1347,69 +1410,6 @@ const TT = {
       r.readAsText(f);
     };
     inp.click();
-  },
-  async notif(){
-    if(!('Notification' in window)){ toast('Notifications not supported on this browser'); return; }
-    const perm = await Notification.requestPermission();
-    if(perm==='granted'){
-      toast('🔔 Notifications enabled');
-      TT._scheduleChecks();
-    } else {
-      toast('Notifications blocked');
-    }
-  },
-  _checkTimer:null,
-  _scheduleChecks(){
-    if(TT._checkTimer) clearInterval(TT._checkTimer);
-    let lastFired = _load(LS.TT+'_lastFired','');
-    TT._checkTimer = setInterval(()=>{
-      const now=new Date();
-      const hhmm = now.toTimeString().slice(0,5);
-      const todayDay = now.getDay();
-      const starting = S.tt.sessions.find(s=>s.day===todayDay && s.start===hhmm);
-      if(starting && lastFired!==starting.id+hhmm){
-        lastFired = starting.id+hhmm;
-        _save(LS.TT+'_lastFired', lastFired);
-        TT._ringAlarm(starting);
-      }
-    },15000);
-    if('serviceWorker' in navigator && !TT._swMsgBound){
-      TT._swMsgBound = true;
-      navigator.serviceWorker.addEventListener('message', e=>{
-        if(e.data && e.data.type==='STOP_ALARM') TT._stopAlarm(e.data.alarmId);
-      });
-    }
-  },
-  async _ringAlarm(session){
-    if(!('Notification' in window) || Notification.permission!=='granted') return;
-    const alarmId = 'tt-alarm-'+session.id;
-    localStorage.setItem('tt_active_'+alarmId,'1');
-    const title = '⏰ '+session.name+' is starting';
-    const body = `${session.start}–${session.end} · tap Stop to dismiss`;
-    const ring = async ()=>{
-      if(localStorage.getItem('tt_active_'+alarmId)!=='1'){ TT._stopAlarm(alarmId); return; }
-      if(navigator.vibrate) navigator.vibrate([300,150,300,150,300]);
-      if('serviceWorker' in navigator){
-        const reg = await navigator.serviceWorker.ready;
-        reg.active && reg.active.postMessage({type:'RING_ALARM', alarmId, title, body});
-      } else {
-        new Notification(title, {body});
-      }
-    };
-    ring();
-    if(TT._alarmInterval) clearInterval(TT._alarmInterval);
-    TT._alarmInterval = setInterval(ring, 5000);
-    if(TT._alarmTimeout) clearTimeout(TT._alarmTimeout);
-    TT._alarmTimeout = setTimeout(()=>TT._stopAlarm(alarmId), 60000);
-  },
-  async _stopAlarm(alarmId){
-    localStorage.removeItem('tt_active_'+alarmId);
-    if(TT._alarmInterval){ clearInterval(TT._alarmInterval); TT._alarmInterval=null; }
-    if(TT._alarmTimeout){ clearTimeout(TT._alarmTimeout); TT._alarmTimeout=null; }
-    if('serviceWorker' in navigator){
-      const reg = await navigator.serviceWorker.ready;
-      reg.active && reg.active.postMessage({type:'CLEAR_ALARM', alarmId});
-    }
   }
 };
 
@@ -1483,6 +1483,42 @@ const CACHE = {
     });
     if(purged > 0){ toast(`🧹 Removed ${purged} stale error cache entry${purged>1?'s':''}`); CACHE.render(); }
     else toast('✅ No stale cache entries found');
+  },
+
+  // Runs quietly in the background right after login (see APP.init()).
+  // Only fetches sets that aren't already cached (or whose cache entry
+  // was a stored error), so this also picks up newly-added content
+  // (new chapters/files in chapters-data.js) without a full re-download
+  // every time, and without ever blocking the UI.
+  async autoSync(){
+    if(!S.online || S.forcedOffline) return;
+    function isCached(key){
+      const v = _load(LS.QC+key, null);
+      return v && !(typeof v==='object' && !Array.isArray(v) && v.success===false);
+    }
+    const missing = ChapterData.allFileRefs().filter(r=>!isCached(r.key));
+    if(!missing.length) return;
+    CACHE._badge(`📦 Syncing 0/${missing.length}…`);
+    let done=0;
+    for(const ref of missing){
+      try{ await QUIZ._fetch(ref.fid, ref.key); }catch{ /* skip failures quietly, retried next login */ }
+      done++;
+      CACHE._badge(`📦 Syncing ${done}/${missing.length}…`);
+    }
+    CACHE._badge(null);
+    if(UI.cur==='offline') CACHE.render();
+  },
+  _badge(msg){
+    let el = document.getElementById('cache-autobadge');
+    if(msg===null){ if(el) el.style.display='none'; return; }
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'cache-autobadge';
+      el.style.cssText = 'position:fixed;bottom:calc(var(--bn-h,0px) + 1rem + var(--safe-b,0px));right:1rem;background:var(--c2);border:1px solid var(--bd);border-radius:999px;padding:.4rem .8rem;font-size:.7rem;color:var(--t2);z-index:9998;box-shadow:var(--sh3);display:flex;align-items:center;gap:.4rem';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.display = 'flex';
   }
 };
 
@@ -1544,8 +1580,8 @@ const APP = {
     CACHE.render();
     _updateNetBtn();
     _updateOfflineWarn();
-    if('Notification' in window && Notification.permission==='granted') TT._scheduleChecks();
     AUTH.startPeriodicRecheck();
+    CACHE.autoSync();
   }
 };
 
@@ -1582,7 +1618,7 @@ function _updateNetBtn(){
   }
 }
 
-/* ═══════════════ NET ═══════════════ */
+/* ═══════════════ NET — manual online/offline toggle ═══════════════ */
 const NET = {
   toggle(){
     if(!S.online && !S.forcedOffline){
@@ -1598,8 +1634,7 @@ const NET = {
     }
     _updateNetBtn();
     _updateOfflineWarn();
-  },
-  updateUI(){ _updateNetBtn(); _updateOfflineWarn(); }
+  }
 };
 window.addEventListener('online', ()=>{
   S.online=true;
@@ -1618,50 +1653,14 @@ window.addEventListener('offline', ()=>{
   _updateOfflineWarn();
 });
 
-/* ── boot ── */
+/* ── boot sequence ── */
 document.addEventListener('DOMContentLoaded', ()=>{
   if(_load('ha_theme','dark')==='light') document.body.classList.add('light');
   PWA.init();
   AUTH.restore();
 });
 
-/* ═══════════════ MISSING MODULES (HTML expects these) ═══════════════ */
-const SRCH = {
-  toggle(){
-    const p = document.getElementById('fc-srch');
-    if(p) p.classList.toggle('open');
-  },
-  go(){
-    const q = document.getElementById('fc-srch-q')?.value?.trim();
-    if(!q) return;
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
-  }
-};
-window.SRCH = SRCH;
-
-const SW_UPDATE = {
-  init(){
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.addEventListener('message', e=>{
-        if(e.data?.type === 'UPDATE_AVAILABLE'){
-          const t = document.getElementById('update-toast');
-          if(t) t.style.display = 'block';
-        }
-      });
-    }
-  }
-};
-window.SW_UPDATE = SW_UPDATE;
-
-const ADMIN = {
-  open(){
-    toast('Admin panel lives in admin.html — redirecting…');
-    setTimeout(()=> window.location.href = 'admin.html', 1200);
-  }
-};
-window.ADMIN = ADMIN;
-
-/* ═══════════════ GLOBAL EXPOSURE ═══════════════ */
+/* ═══════════════ EXPLICIT GLOBAL EXPOSURE ═══════════════ */
 window.AUTH = AUTH;
 window.NET = NET;
 window.UI = UI;

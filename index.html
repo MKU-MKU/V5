@@ -129,8 +129,6 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 /* Responsive */
 @media(max-width:480px){.card{padding:1.5rem 1.1rem;margin:.8rem}.fld-row{grid-template-columns:1fr}}
 </style>
-<base target="_blank">
-<base target="_blank">
 </head>
 <body>
 <div class="bg-blobs"><div class="blob"></div><div class="blob"></div><div class="blob"></div></div>
@@ -510,7 +508,12 @@ const APP = {
              : res.needsPayment ? 'expired'
              : 'pending',
       trialExpiresAt: res.trialExpiresAt || user.trialExpiresAt,
-      permanent: !!(res.permanentAccess || user.status === 'active')
+      permanent: !!(res.permanentAccess || user.status === 'active'),
+      // "permanent" | "yearly" — cosmetic only; the backend (checkYearlyExpiry_)
+      // already downgrades an expired yearly grant to needsPayment before this
+      // response is even sent, so `level` above is the only thing that gates access.
+      accessType: res.accessType || user.accessType || 'permanent',
+      accessExpiresAt: res.accessExpiresAt || user.accessExpiresAt || ''
     };
 
     const session = {

@@ -15,6 +15,7 @@
 <style>
 /* ═══════════════════════════════════════
    DESIGN TOKENS — HAMRO AFNAI 2.0
+   Palette: Blueprint Navy + Amber Flame + Teal Signal
 ═══════════════════════════════════════ */
 :root{
   --c0:#080B14;--c1:#0D1221;--c2:#121829;--c3:#18203A;--c4:#1E2847;--c5:#243055;
@@ -28,6 +29,7 @@
   --ok:var(--grn);--ok-bg:rgba(34,197,94,.12);--ok-bd:rgba(34,197,94,.35);
   --bad:var(--ros);--bad-bg:rgba(244,63,94,.11);--bad-bd:rgba(244,63,94,.35);
   --warn:var(--amb);--warn-bg:rgba(245,166,35,.11);--warn-bd:rgba(245,166,35,.35);
+  /* aliases app.js depends on */
   --neon:var(--sky);--neon2:var(--vio);--neon3:var(--grn);--neon4:var(--amb);--neon5:var(--ros);
   --bg0:var(--c0);--bg1:var(--c1);--bg2:var(--c2);
   --surf:var(--c3);--surf2:var(--c4);--surf3:var(--c5);
@@ -42,8 +44,9 @@
   --t1:#EEF2FF;--t2:#8B9CC8;--t3:#4A5680;
   --ease:.15s cubic-bezier(.4,0,.2,1);--spring:.22s cubic-bezier(.34,1.56,.64,1);--eout:.2s cubic-bezier(0,0,.2,1);
   --safe-b:env(safe-area-inset-bottom,0px);
-  --sb-w:260px;--tb-h:56px;--bn-h:64px;
+  --sb-w:240px;--tb-h:56px;--bn-h:60px;
 }
+
 .light{
   --c0:#F4F6FB;--c1:#EBF0FA;--c2:#FFFFFF;--c3:#FFFFFF;--c4:#EDF1FF;--c5:#DDE4F5;
   --b0:rgba(0,0,0,.03);--b1:rgba(0,0,0,.08);--b2:rgba(0,0,0,.12);--b3:rgba(0,0,0,.18);
@@ -51,6 +54,7 @@
   --amb:#C47A0A;--teal:#007D6B;--vio:#5B21B6;--sky:#0369A1;--grn:#15803D;--ros:#BE123C;
   --sh1:0 1px 6px rgba(0,0,0,.07);--sh2:0 4px 18px rgba(0,0,0,.09);--sh3:0 12px 40px rgba(0,0,0,.13);
 }
+
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth;height:100%}
 body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background .2s,color .2s}
@@ -60,23 +64,26 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 ::selection{background:rgba(245,166,35,.22);color:var(--t1)}
 button{font-family:var(--ff)}
 
+/* ═══ APP SHELL ═══ */
 #app{display:none;flex-direction:column;min-height:100vh}
 #app.on{display:flex}
 .off-bar{background:linear-gradient(90deg,#7C1D1D,#9B2323);color:#fff;text-align:center;font-size:.69rem;font-weight:700;padding:.32rem 1rem;display:none;letter-spacing:.4px;border-bottom:1px solid rgba(255,255,255,.12)}
 .off-bar.show{display:block}
 
+/* ═══ SESSION GATE (checking access before showing app) ═══ */
 #sg{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--c0);flex-direction:column;gap:1rem}
 #sg .sg-spin{width:38px;height:38px;border:3px solid rgba(245,166,35,.2);border-top-color:var(--amb);border-radius:50%;animation:spin .7s linear infinite}
 #sg .sg-txt{font-size:.8rem;color:var(--t2);font-weight:600}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ═══ TOPBAR ═══ */
 #tb{height:var(--tb-h);background:rgba(8,11,20,.92);backdrop-filter:blur(32px) saturate(1.6);-webkit-backdrop-filter:blur(32px) saturate(1.6);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 .9rem 0 1rem;position:sticky;top:0;z-index:500;flex-shrink:0}
 .light #tb{background:rgba(244,246,251,.95);border-color:var(--b1)}
 .tb-brand{display:flex;align-items:center;gap:.55rem;font-family:var(--fd);font-size:.95rem;font-weight:700;letter-spacing:-.2px;cursor:pointer;color:var(--t1);user-select:none;transition:opacity var(--ease)}
 .tb-brand:hover{opacity:.8}
 .bd-mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--amb2),var(--amb));display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;box-shadow:0 0 14px rgba(245,166,35,.4),inset 0 1px 0 rgba(255,255,255,.2)}
 .tb-name{display:flex;flex-direction:column;line-height:1}
-.tb-name-main{font-size:.9rem;font-weight:700;background:linear-gradient(90deg,#FDE68A,var(--amb),#FCD34D);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.tb-name-main{font-size:.9rem;font-weight:700;background:linear-gradient(90deg,var(--t1),var(--t2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .tb-name-sub{font-size:.52rem;color:var(--t3);font-weight:500;letter-spacing:.8px;text-transform:uppercase;margin-top:.06rem;-webkit-text-fill-color:var(--t3)}
 @media(max-width:380px){.tb-name-sub{display:none}}
 .tb-r{display:flex;align-items:center;gap:.28rem}
@@ -89,11 +96,12 @@ button{font-family:var(--ff)}
 .uchip{background:var(--b0);border:1px solid var(--b1);border-radius:30px;padding:.26rem .68rem;font-size:.68rem;font-weight:600;color:var(--t2);display:flex;align-items:center;gap:.26rem}
 @media(max-width:600px){.uchip{display:none}}
 
+/* ═══ LAYOUT ═══ */
 #layout{display:flex;flex:1;min-height:0;overflow:hidden}
 #sb{width:var(--sb-w);flex-shrink:0;background:var(--c1);border-right:1px solid var(--b1);overflow-y:auto;padding:.75rem .5rem;transition:transform var(--eout);display:flex;flex-direction:column}
 .light #sb{background:var(--c1)}
 @media(max-width:960px){
-  #sb{position:fixed;left:0;top:var(--tb-h);bottom:0;z-index:400;transform:translateX(-110%);width:280px;box-shadow:none}
+  #sb{position:fixed;left:0;top:var(--tb-h);bottom:0;z-index:400;transform:translateX(-110%);width:260px;box-shadow:none}
   #sb.open{transform:translateX(0);box-shadow:var(--sh3)}
 }
 #ov{display:none;position:fixed;inset:0;z-index:399;background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
@@ -103,11 +111,11 @@ button{font-family:var(--ff)}
 @media(max-width:960px){.sb-close{display:flex}}
 .sb-sec{margin-bottom:.35rem}
 .sb-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3);padding:.3rem .48rem .15rem;margin-bottom:.1rem}
-.sb-item{display:flex;align-items:center;gap:.48rem;padding:.5rem .55rem;border-radius:var(--r1);font-size:.78rem;font-weight:500;color:var(--t2);cursor:pointer;transition:all var(--ease);margin-bottom:2px;border:1px solid transparent;position:relative}
+.sb-item{display:flex;align-items:center;gap:.48rem;padding:.44rem .52rem;border-radius:var(--r1);font-size:.78rem;font-weight:500;color:var(--t2);cursor:pointer;transition:all var(--ease);margin-bottom:1px;border:1px solid transparent}
 .sb-item:hover{background:var(--b0);color:var(--t1)}
 .sb-item.active{background:linear-gradient(90deg,rgba(245,166,35,.14),rgba(245,166,35,.05));color:var(--amb);border-color:rgba(245,166,35,.2);font-weight:600}
 .sb-item.active .sb-ic{filter:drop-shadow(0 0 4px rgba(245,166,35,.5))}
-.sb-ic{width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;border-radius:6px;transition:all var(--ease)}
+.sb-ic{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
 .sb-badge{margin-left:auto;background:var(--vio);color:#fff;font-size:.56rem;padding:.08rem .34rem;border-radius:20px;font-weight:700}
 .sb-badge.ok{background:var(--grn)}.sb-badge.amb{background:var(--amb);color:#000}
 .sb-div{height:1px;background:var(--b1);margin:.35rem .48rem}
@@ -116,11 +124,11 @@ button{font-family:var(--ff)}
 .sel-c:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(245,166,35,.12)}
 .sel-c option{background:var(--c1)}
 
+/* ═══ MAIN ═══ */
 #main{flex:1;overflow-y:auto;padding:1.1rem 1.1rem 1.8rem}
-#main.quiz-active{overflow-y:visible}
-@media(max-width:960px){#main.quiz-active{overflow-y:auto}}
 @media(max-width:960px){#main{padding:.85rem .75rem calc(var(--bn-h) + var(--safe-b) + .75rem)}}
 
+/* ═══ VIEWS ═══ */
 .view{display:none}
 .view.on{display:block;animation:vfade .16s var(--eout)}
 @keyframes vfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -128,6 +136,7 @@ button{font-family:var(--ff)}
 .ph h2{font-family:var(--fd);font-size:1.15rem;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:.42rem;color:var(--t1)}
 .ph p{font-size:.74rem;color:var(--t2);margin-top:.18rem;line-height:1.5}
 
+/* ═══ CARDS ═══ */
 .card{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r3);padding:1rem 1.05rem;box-shadow:var(--sh1);margin-bottom:.8rem}
 .light .card{background:var(--c3)}
 .card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:1px solid var(--b1)}
@@ -136,6 +145,7 @@ button{font-family:var(--ff)}
 .tc{background:rgba(56,189,248,.12);color:var(--sky)}.tp{background:rgba(139,92,246,.13);color:var(--vio)}
 .tg{background:rgba(34,197,94,.11);color:var(--grn)}.ta{background:rgba(245,166,35,.13);color:var(--amb)}.tr{background:rgba(244,63,94,.11);color:var(--ros)}
 
+/* ═══ BUTTONS ═══ */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.28rem;padding:.44rem .88rem;border-radius:var(--r1);font-size:.76rem;font-weight:600;font-family:var(--ff);cursor:pointer;border:1.5px solid transparent;transition:all var(--ease);white-space:nowrap;user-select:none}
 .btn:disabled{opacity:.42;cursor:not-allowed}
 .btn-c{background:rgba(56,189,248,.1);color:var(--sky);border-color:rgba(56,189,248,.25)}
@@ -155,11 +165,13 @@ button{font-family:var(--ff)}
 .btn-blk{width:100%;display:flex}
 .bg{display:flex;gap:.38rem;flex-wrap:wrap}
 
+/* ═══ GRIDS ═══ */
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
 @media(max-width:560px){.g3,.g4{grid-template-columns:1fr 1fr}}
 
+/* ═══ DASHBOARD HERO — blueprint rings signature ═══ */
 .hero{position:relative;overflow:hidden;border-radius:var(--r4);background:linear-gradient(135deg,rgba(30,40,71,.9) 0%,rgba(18,24,41,.95) 60%,rgba(12,17,33,.98) 100%);border:1px solid rgba(245,166,35,.18);padding:1.3rem 1.4rem;margin-bottom:.85rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .hero::before{content:'';position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:50%;background:transparent;border:40px solid rgba(245,166,35,.04);pointer-events:none}
 .hero::after{content:'';position:absolute;right:-30px;top:-30px;width:160px;height:160px;border-radius:50%;background:transparent;border:28px solid rgba(245,166,35,.07);pointer-events:none}
@@ -169,12 +181,14 @@ button{font-family:var(--ff)}
 .hero-sub{font-size:.74rem;color:var(--t2);line-height:1.55}
 .hero-icon{font-size:2.5rem;flex-shrink:0;line-height:1;position:relative;z-index:1;filter:drop-shadow(0 0 12px rgba(245,166,35,.4))}
 
+/* Stats */
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem;margin-bottom:.85rem}
 @media(max-width:500px){.stats-row{grid-template-columns:1fr 1fr}}
 .scard{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r2);padding:.8rem .55rem;text-align:center;position:relative;overflow:hidden;transition:transform var(--spring),box-shadow var(--ease)}
 .scard:hover{transform:translateY(-2px);box-shadow:var(--sh1)}
 .scard::after{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;border-radius:var(--r2) var(--r2) 0 0;opacity:0;transition:opacity .3s}
 .scard.sc-c::after{background:linear-gradient(90deg,var(--vio),var(--sky));opacity:1}.scard.sc-g::after{background:var(--grn);opacity:1}.scard.sc-r::after{background:var(--ros);opacity:1}.scard.sc-a::after{background:linear-gradient(90deg,var(--amb),#FDE68A);opacity:1}
+/* keep .sc for app.js result screen */
 .sc{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r2);padding:.8rem .55rem;text-align:center;position:relative;overflow:hidden}
 .sc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
 .sc:not([class*=sc-])::after,.sc.sc-c::after{background:linear-gradient(90deg,var(--vio),var(--sky))}.sc.sc-g::after{background:var(--grn)}.sc.sc-r::after{background:var(--ros)}.sc.sc-a::after{background:var(--amb)}
@@ -182,6 +196,7 @@ button{font-family:var(--ff)}
 .sl{font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-top:.24rem}
 .tcy{color:var(--sky)}.tc2{color:var(--grn)}.tb2{color:var(--ros)}.ta2{color:var(--amb)}
 
+/* Quick tiles */
 .qa-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;margin-bottom:.85rem}
 .qa-tile{background:var(--c2);border:1px solid transparent;border-radius:var(--r2);padding:.72rem .35rem;display:flex;flex-direction:column;align-items:center;gap:.26rem;cursor:pointer;font-family:var(--ff);font-size:.61rem;font-weight:600;color:var(--t2);text-align:center;transition:all var(--spring);position:relative;overflow:hidden}
 .qa-tile::before{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5px;opacity:0;transition:opacity var(--ease)}
@@ -193,6 +208,7 @@ button{font-family:var(--ff)}
 .qt-grn{border-color:rgba(34,197,94,.13)}.qt-grn::before{background:var(--grn)}.qt-grn:hover{background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.26);color:var(--grn)}
 .qt-amb{border-color:rgba(245,166,35,.14)}.qt-amb::before{background:var(--amb)}.qt-amb:hover{background:rgba(245,166,35,.08);border-color:rgba(245,166,35,.28);color:var(--amb)}
 
+/* Daily challenge */
 .daily-card{position:relative;overflow:hidden;background:linear-gradient(135deg,rgba(245,166,35,.12) 0%,rgba(18,24,41,.98) 55%);border:1.5px solid rgba(245,166,35,.25);border-radius:var(--r3);padding:1.05rem 1.1rem;margin-bottom:.85rem}
 .daily-card::after{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(245,166,35,.1),transparent 70%);pointer-events:none}
 .daily-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
@@ -214,6 +230,7 @@ button{font-family:var(--ff)}
 .home-clock{font-family:var(--fm);font-size:1.7rem;font-weight:700;color:var(--amb);text-align:center;padding:.6rem 0;letter-spacing:2.5px;text-shadow:0 0 18px var(--amb-glow)}
 .home-date{text-align:center;font-size:.68rem;color:var(--t3);margin-bottom:.5rem}
 
+/* ═══ CHAPTER / PSYCHO ═══ */
 .ch-list{max-height:260px;overflow-y:auto;margin:.4rem 0}
 .ch-item{display:flex;align-items:center;gap:.5rem;padding:.34rem .4rem;border-radius:var(--r1);margin-bottom:2px;cursor:pointer;transition:background var(--ease)}
 .ch-item:hover{background:var(--b0)}
@@ -223,7 +240,10 @@ button{font-family:var(--ff)}
 .psy-hero{background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(245,166,35,.07));border:1px solid rgba(139,92,246,.28);border-radius:var(--r3);padding:.85rem .95rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.8rem}
 .psy-hero-ic{font-size:1.8rem}
 .psy-hero-text h4{font-family:var(--fd);font-size:.88rem;font-weight:700;color:var(--vio)}.psy-hero-text p{font-size:.7rem;color:var(--t3);margin-top:.12rem;line-height:1.5}
+.psy-lv-hd{display:flex;align-items:center;justify-content:space-between;padding:.18rem .4rem;margin-top:.6rem;margin-bottom:.2rem}
+.psy-lv-hd span{font-size:.57rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3)}.psy-lv-btns{display:flex;gap:.26rem}
 
+/* ═══ QUIZ BAR ═══ */
 .qbar{position:sticky;top:4px;z-index:100;border-radius:14px;border:1px solid var(--b2);overflow:hidden;box-shadow:var(--sh2),0 0 0 1px rgba(245,166,35,.06),inset 0 1px 0 rgba(255,255,255,.04);margin-bottom:.9rem}
 .qb-l1{display:flex;align-items:center;justify-content:center;gap:.52rem;min-height:28px;padding:.28rem .85rem;background:linear-gradient(90deg,rgba(109,40,217,.25) 0%,rgba(245,166,35,.12) 50%,rgba(109,40,217,.25) 100%);border-bottom:1px solid rgba(245,166,35,.12)}
 .qb-pill{flex-shrink:0;background:rgba(245,166,35,.14);border:1px solid rgba(245,166,35,.35);border-radius:30px;padding:.1rem .48rem;font-size:.56rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--amb);white-space:nowrap}
@@ -251,6 +271,7 @@ button{font-family:var(--ff)}
 .qprog,.qbprog{height:3px;background:var(--b1);border-radius:3px;overflow:hidden}
 .qpf,.qbpf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--amb2),var(--amb));transition:width .3s ease}
 
+/* Question card */
 .qcard{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r3);padding:1rem;margin-bottom:.75rem;box-shadow:var(--sh1);transition:border-color var(--ease)}
 .qcard:hover{border-color:var(--b2)}
 .qm{display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem}
@@ -261,6 +282,7 @@ button{font-family:var(--ff)}
 .fc-nav{display:flex;align-items:center;justify-content:space-between;padding:.7rem 0}
 .fc-hint{font-size:.7rem;color:var(--t3);font-weight:500}
 
+/* Answer options */
 .eo{display:flex;align-items:center;gap:.42rem;padding:.38rem .62rem;margin:.16rem 0;border-radius:var(--r1);font-size:.8rem;font-weight:500;background:var(--c1);border:1px solid var(--b1);cursor:pointer;transition:all var(--ease)}
 .eo:hover{background:var(--b0);border-color:var(--b2)}.eo.sel{background:rgba(56,189,248,.08);border-color:rgba(56,189,248,.32);color:var(--sky)}
 .eo.ok2{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--grn)}.eo.bad2{background:var(--bad-bg);border-color:var(--bad-bd);color:var(--ros);text-decoration:line-through}.eo.shc{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--grn)}
@@ -268,6 +290,7 @@ button{font-family:var(--ff)}
 .expl.show{display:block}
 .eqc{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r2);padding:.85rem;margin-bottom:.6rem;border-left:3px solid var(--b2);transition:border-color .18s}.eqc.answered{border-left-color:var(--amb)}
 
+/* Search */
 .srch-panel{margin-top:.55rem;display:none}.srch-panel.open{display:block}
 .srch-row{display:flex;gap:.35rem}
 .srch-inp{flex:1;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.42rem .68rem;color:var(--t1);font-size:.78rem;font-family:var(--ff);outline:none;transition:border-color var(--ease),box-shadow var(--ease)}
@@ -276,7 +299,11 @@ button{font-family:var(--ff)}
 .srch-links{display:flex;gap:.32rem;flex-wrap:wrap;margin-top:.4rem}
 .sl{display:inline-flex;align-items:center;gap:.2rem;padding:.2rem .5rem;border-radius:7px;font-size:.66rem;font-weight:700;text-decoration:none;border:1px solid;transition:all var(--ease);cursor:pointer;white-space:nowrap}
 .sl-g{background:rgba(66,133,244,.1);border-color:rgba(66,133,244,.28);color:#5e9ef7}.sl-g:hover{background:#4285f4;color:#fff}
+.sl-y{background:rgba(255,70,70,.1);border-color:rgba(255,70,70,.26);color:#ff7070}.sl-y:hover{background:#f00;color:#fff}
+.sl-w{background:rgba(100,130,200,.1);border-color:rgba(100,130,200,.26);color:#90aae0}.sl-w:hover{background:#3b5fc0;color:#fff}
+.sl-n{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.28);color:var(--grn)}.sl-n:hover{background:var(--grn);color:#fff}
 
+/* Result */
 .rh{text-align:center;padding:1.5rem 1rem .85rem}
 .ring{width:108px;height:108px;border-radius:50%;background:conic-gradient(var(--amb) var(--p,0%),var(--c2) 0%);display:flex;align-items:center;justify-content:center;margin:0 auto .9rem;position:relative;box-shadow:0 0 28px var(--amb-glow)}
 .ring::before{content:'';position:absolute;inset:11px;background:var(--c3);border-radius:50%}
@@ -285,6 +312,7 @@ button{font-family:var(--ff)}
 .pb-w{margin:.42rem 0}.pb-l{display:flex;justify-content:space-between;font-size:.66rem;color:var(--t3);margin-bottom:.18rem}
 .pb{height:5px;background:var(--c1);border-radius:3px;overflow:hidden}.pb-f{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--amb2),var(--amb));transition:width .5s ease}
 
+/* Timetable */
 .tt-clock{text-align:center;padding:.85rem 0;font-family:var(--fm);font-size:1.8rem;font-weight:700;color:var(--amb);letter-spacing:2.5px;text-shadow:0 0 20px var(--amb-glow)}
 .tt-date{text-align:center;font-size:.68rem;color:var(--t3);margin-bottom:.65rem}
 .tt-now{background:linear-gradient(135deg,rgba(245,166,35,.07),rgba(139,92,246,.06));border:1px solid rgba(245,166,35,.16);border-radius:var(--r2);padding:.85rem;margin-bottom:.65rem;text-align:center}
@@ -295,11 +323,13 @@ button{font-family:var(--ff)}
 .tt-form input[type=time],.tt-form input[type=text],.tt-form select{width:100%;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.5rem .68rem;color:var(--t1);font-size:.8rem;font-family:var(--ff);outline:none;margin-bottom:.28rem}
 .tt-form input:focus,.tt-form select:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(245,166,35,.12)}.tt-form select option{background:var(--c1)}
 
+/* Cache */
 .cpb{height:6px;background:var(--c1);border-radius:4px;overflow:hidden;margin:.42rem 0;display:none}.cpf{height:100%;background:linear-gradient(90deg,var(--amb2),var(--amb));border-radius:4px;width:0;transition:width .3s}
 .cg{display:grid;grid-template-columns:1fr 1fr;gap:.42rem}
 .ci{background:var(--c1);border:1px solid var(--b1);border-radius:var(--r1);padding:.52rem .68rem}.ci-n{font-size:.73rem;font-weight:600;margin-bottom:.26rem}.ci-s{display:flex;align-items:center;gap:.3rem;font-size:.66rem;color:var(--t3)}
 .cd{width:8px;height:8px;border-radius:50%;background:var(--ros)}.cd.y{background:var(--grn)}
 
+/* Toasts */
 #toasts{position:fixed;bottom:1.8rem;left:50%;transform:translateX(-50%);z-index:9000;display:flex;flex-direction:column;align-items:center;gap:.3rem;pointer-events:none;width:calc(100vw - 2rem);max-width:340px}
 @media(max-width:960px){#toasts{bottom:calc(var(--bn-h) + 1rem + var(--safe-b))}}
 .toast{background:rgba(18,24,41,.97);border:1px solid var(--b2);backdrop-filter:blur(20px);border-radius:var(--r2);padding:.52rem .92rem;font-size:.76rem;font-weight:600;color:var(--t1);box-shadow:var(--sh2);animation:tin .18s var(--spring);pointer-events:auto;max-width:100%}
@@ -307,6 +337,7 @@ button{font-family:var(--ff)}
 @keyframes tin{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:none}}
 @keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
 
+/* Modal */
 .mbg{position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:1rem}.mbg.show{display:flex}
 .mbox{background:var(--c2);border:1px solid var(--b2);border-radius:var(--r4);width:100%;max-width:420px;max-height:88vh;overflow-y:auto;box-shadow:var(--sh3);animation:mfade .16s var(--spring)}
 @keyframes mfade{from{opacity:0;transform:scale(.93) translateY(8px)}to{opacity:1;transform:none}}
@@ -319,76 +350,20 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 input[type=file]{background:var(--c1);border:1.5px dashed var(--b2);border-radius:var(--r1);padding:.52rem .8rem;color:var(--t2);font-size:.76rem;width:100%;cursor:pointer;transition:border-color var(--ease)}
 input[type=file]:hover{border-color:var(--amb)}
 
+/* ═══ MOBILE BOTTOM NAV ═══ */
 #bnav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;height:var(--bn-h);background:rgba(8,11,20,.96);backdrop-filter:blur(28px) saturate(1.5);-webkit-backdrop-filter:blur(28px) saturate(1.5);border-top:1px solid var(--b1);padding-bottom:var(--safe-b);align-items:flex-start;justify-content:space-around;padding-top:6px}
 .light #bnav{background:rgba(244,246,251,.97);border-color:var(--b1)}
 @media(max-width:960px){#bnav{display:flex}}
-.bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:.3rem .5rem;border-radius:var(--r1);color:var(--t3);font-size:.56rem;font-weight:600;transition:all var(--ease);border:none;background:none;font-family:var(--ff);min-width:52px;position:relative}
+.bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:.3rem .5rem;border-radius:var(--r1);color:var(--t3);font-size:.56rem;font-weight:600;transition:all var(--ease);border:none;background:none;font-family:var(--ff);min-width:52px}
 .bn-item.active{color:var(--amb)}
 .bn-item.active .bn-ic{background:rgba(245,166,35,.14);border-color:rgba(245,166,35,.28);filter:drop-shadow(0 0 4px rgba(245,166,35,.4))}
 .bn-ic{width:34px;height:34px;border-radius:10px;border:1px solid transparent;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:all var(--ease)}
 .bn-more{position:relative}
 .bn-badge{position:absolute;top:4px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--amb);border:1.5px solid var(--c0)}
 
+/* Online study banner */
 .on-card-banner{background:linear-gradient(135deg,rgba(56,189,248,.1),rgba(139,92,246,.07));border:1px solid rgba(56,189,248,.2);border-radius:var(--r2);padding:.75rem .9rem;margin-bottom:.75rem;font-size:.74rem;color:var(--t2);display:flex;align-items:center;gap:.6rem}
 .on-card-banner span{font-size:1.1rem}
-
-.tag-bar{display:flex;gap:.3rem;flex-wrap:wrap;margin:.4rem 0}
-.tag-pill{background:var(--b0);border:1px solid var(--b1);border-radius:20px;padding:.15rem .45rem;font-size:.6rem;font-weight:600;color:var(--t3);cursor:pointer;transition:all var(--ease)}
-.tag-pill:hover{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.3);color:var(--amb)}
-.tag-pill.active{background:rgba(245,166,35,.14);border-color:rgba(245,166,35,.35);color:var(--amb)}
-
-.predict-card{background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(56,189,248,.07));border:1px solid rgba(139,92,246,.2);border-radius:var(--r3);padding:1rem;margin-bottom:.85rem}
-.pred-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
-.pred-bar{flex:1;height:6px;background:var(--c1);border-radius:3px;overflow:hidden}
-.pred-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--vio),var(--sky));transition:width .6s ease}
-.pred-lbl{font-size:.7rem;color:var(--t2);min-width:70px}
-.pred-val{font-family:var(--fm);font-size:.75rem;font-weight:700;color:var(--t1);min-width:36px;text-align:right}
-
-/* Tag system for review pages */
-.tag-filter-row{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.6rem;padding:.3rem 0}
-.tag-add-row{display:flex;gap:.3rem;margin:.4rem 0}
-.tag-add-inp{flex:1;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.35rem .55rem;color:var(--t1);font-size:.74rem;outline:none}
-.tag-add-inp:focus{border-color:var(--amb)}
-.rev-item{background:var(--c1);border:1px solid var(--b1);border-radius:var(--r2);padding:.65rem .8rem;margin-bottom:.5rem;transition:all var(--ease)}
-.rev-item:hover{border-color:var(--b2)}
-.rev-q{font-size:.78rem;font-weight:500;color:var(--t1);margin-bottom:.3rem;line-height:1.5}
-.rev-meta{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.35rem}
-.rev-tag{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:20px;padding:.1rem .4rem;font-size:.6rem;font-weight:600;color:var(--vio);cursor:pointer;transition:all var(--ease)}
-.rev-tag:hover{background:var(--vio);color:#fff}
-.rev-tag.tg-f{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.25);color:var(--amb)}
-.rev-tag.tg-f:hover{background:var(--amb);color:#000}
-.rev-tag.tg-r{background:rgba(244,63,94,.1);border-color:rgba(244,63,94,.25);color:var(--ros)}
-.rev-tag.tg-r:hover{background:var(--ros);color:#fff}
-.rev-tag.tg-c{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.25);color:var(--grn)}
-.rev-tag.tg-c:hover{background:var(--grn);color:#fff}
-.rev-tag.tg-i{background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.25);color:var(--sky)}
-.rev-tag.tg-i:hover{background:var(--sky);color:#fff}
-.rev-tag.tg-n{background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.25);color:#a855f7}
-.rev-tag.tg-n:hover{background:#a855f7;color:#fff}
-.rev-acts{display:flex;gap:.3rem;justify-content:flex-end}
-
-/* Shuffle toggle */
-.shuf-row{display:flex;align-items:center;gap:.6rem;margin:.4rem 0;padding:.4rem;background:var(--c1);border-radius:var(--r1);border:1px solid var(--b1)}
-.shuf-lbl{font-size:.74rem;color:var(--t2);font-weight:500}
-.toggle-switch{position:relative;width:40px;height:22px;background:var(--c3);border-radius:20px;cursor:pointer;transition:background var(--ease);border:1px solid var(--b1);flex-shrink:0}
-.toggle-switch.on{background:var(--grn);border-color:var(--grn)}
-.toggle-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform var(--ease);box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.toggle-switch.on .toggle-knob{transform:translateX(18px)}
-
-/* Admin access tier */
-.adm-tier{display:flex;gap:.4rem;margin:.4rem 0}
-.adm-tier button{flex:1;padding:.4rem .6rem;border-radius:var(--r1);font-size:.7rem;font-weight:600;border:1px solid var(--b1);background:var(--c1);color:var(--t2);cursor:pointer;transition:all var(--ease)}
-.adm-tier button.sel{background:var(--amb);color:#000;border-color:var(--amb);box-shadow:var(--gamb)}
-
-/* AI Explanation button */
-
-/* Study time tracker */
-.time-track{display:flex;align-items:center;gap:.4rem;background:var(--c1);border:1px solid var(--b1);border-radius:var(--r1);padding:.35rem .6rem;font-size:.68rem;color:var(--t3);margin-bottom:.6rem}
-.time-track span{font-family:var(--fm);color:var(--amb);font-weight:700}
-
-/* Swipe hint */
-.swipe-hint{display:none;position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:350;padding:.3rem;background:var(--amb);color:#000;font-size:.6rem;font-weight:700;border-radius:0 6px 6px 0;writing-mode:vertical-rl;text-orientation:mixed;letter-spacing:1px;opacity:.7}
-@media(max-width:960px){.swipe-hint{display:block}}
 
 @media(max-width:700px){.g2{grid-template-columns:1fr}.dash-lower{grid-template-columns:1fr}}
 #net-mode-btn{transition:all var(--ease)}
@@ -396,23 +371,10 @@ input[type=file]:hover{border-color:var(--amb)}
 @keyframes netpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px rgba(244,63,94,.2)}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
-<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
-<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
-<link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
-<link rel="apple-touch-icon" sizes="76x76" href="icons/icon-76.png">
-<link rel="mask-icon" href="icons/safari-pinned-tab.svg" color="#F5A623">
-<meta name="msapplication-TileColor" content="#080B14">
-<meta name="msapplication-TileImage" content="icons/icon-144.png">
-<link rel="dns-prefetch" href="https://fonts.googleapis.com">
-<link rel="dns-prefetch" href="https://fonts.gstatic.com">
-<link rel="dns-prefetch" href="https://script.google.com">
-<link rel="dns-prefetch" href="https://drive.google.com">
-<base target="_blank">
-<base target="_blank">
 </head>
 <body>
 
-<!-- SESSION GATE -->
+<!-- SESSION GATE — verifies the person came here already signed in via index.html -->
 <div id="sg">
   <div class="sg-spin"></div>
   <div class="sg-txt" id="sg-txt">Checking your session…</div>
@@ -435,9 +397,8 @@ input[type=file]:hover{border-color:var(--amb)}
       <div class="uchip" id="uchip">👤 —</div>
       <button class="tb-btn" id="net-mode-btn" onclick="NET.toggle()" title="Online mode — click to force offline" style="font-size:.8rem;min-width:32px;justify-content:center;color:var(--grn);border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.08)">🟢</button>
       <button class="tb-btn" onclick="UI.theme()" title="Toggle theme">🌓</button>
-      <button class="tb-btn" onclick="document.getElementById('shortcuts-modal').style.display='flex'" title="Keyboard shortcuts (Shift+?)">⌨️</button>
       <button class="tb-btn" onclick="PWA.toggleFullscreen()" title="Fullscreen">⛶</button>
-      <button class="tb-btn" id="installBtn" style="display:none" onclick="PWA.install()" title="Install App">📲 Install</button>
+      <button class="tb-btn" id="installBtn" style="display:none" onclick="PWA.install()" title="Install App">📲</button>
       <button class="tb-btn danger" onclick="AUTH.logout()" title="Log out">⏻</button>
     </div>
   </div>
@@ -445,29 +406,36 @@ input[type=file]:hover{border-color:var(--amb)}
   <div id="layout">
     <div id="ov" onclick="UI.sidebarClose()"></div>
 
-    <!-- SIDEBAR — Quick Quiz REMOVED -->
+    <!-- SIDEBAR -->
     <div id="sb">
       <button class="sb-close" onclick="UI.sidebarClose()">✕</button>
+      <div class="card" style="padding:.65rem .75rem;margin-bottom:.7rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+        <div style="min-width:0">
+          <div id="sb-uname" style="font-size:.8rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Student</div>
+          <div id="sb-ustatus" style="font-size:.64rem;color:var(--t3)">—</div>
+        </div>
+        <button class="ib" onclick="AUTH.logout()" title="Log out" style="flex-shrink:0">⏻</button>
+      </div>
       <div class="sb-sec">
         <div class="sb-lbl">Study</div>
-        <div class="sb-item active" id="nav-home"    onclick="UI.go('home');UI.sidebarClose()"><div class="sb-ic">🏠</div>Dashboard</div>
-        <div class="sb-item"        id="nav-online"  onclick="UI.go('online');UI.sidebarClose()"><div class="sb-ic">☁️</div>Online Study</div>
-        <div class="sb-item"        id="nav-local"   onclick="UI.go('local');UI.sidebarClose()"><div class="sb-ic">📂</div>Local File</div>
-        <div class="sb-item"        id="nav-psycho"  onclick="UI.go('psycho');UI.sidebarClose()"><div class="sb-ic">⚡</div>Psycho Mode<span class="sb-badge amb">HOT</span></div>
+        <div class="sb-item active" id="nav-home"    onclick="UI.go('home')"><div class="sb-ic">🏠</div>Dashboard</div>
+        <div class="sb-item"        id="nav-online"  onclick="UI.go('online')"><div class="sb-ic">☁️</div>Online Study</div>
+        <div class="sb-item"        id="nav-local"   onclick="UI.go('local')"><div class="sb-ic">📂</div>Local File</div>
+        <div class="sb-item"        id="nav-psycho"  onclick="UI.go('psycho')"><div class="sb-ic">⚡</div>Psycho Mode<span class="sb-badge amb">HOT</span></div>
       </div>
       <div class="sb-div"></div>
       <div class="sb-sec">
         <div class="sb-lbl">Review</div>
-        <div class="sb-item" id="nav-bookmarks" onclick="UI.go('bookmarks');UI.sidebarClose()"><div class="sb-ic">⭐</div>Bookmarks<span class="sb-badge ok" id="bkc">0</span></div>
-        <div class="sb-item" id="nav-flagged"   onclick="UI.go('flagged');UI.sidebarClose()"><div class="sb-ic">🚩</div>Flagged<span class="sb-badge" id="flc">0</span></div>
-        <div class="sb-item" id="nav-wrong"     onclick="UI.go('wrong');UI.sidebarClose()"><div class="sb-ic">❌</div>Wrong Bank<span class="sb-badge" id="wrc">0</span></div>
+        <div class="sb-item" id="nav-bookmarks" onclick="UI.go('bookmarks')"><div class="sb-ic">⭐</div>Bookmarks<span class="sb-badge ok" id="bkc">0</span></div>
+        <div class="sb-item" id="nav-flagged"   onclick="UI.go('flagged')"><div class="sb-ic">🚩</div>Flagged<span class="sb-badge" id="flc">0</span></div>
+        <div class="sb-item" id="nav-wrong"     onclick="UI.go('wrong')"><div class="sb-ic">❌</div>Wrong Bank<span class="sb-badge" id="wrc">0</span></div>
       </div>
       <div class="sb-div"></div>
       <div class="sb-sec">
         <div class="sb-lbl">Tools</div>
-        <div class="sb-item" id="nav-timetable" onclick="UI.go('timetable');UI.sidebarClose()"><div class="sb-ic">📅</div>Timetable</div>
-        <div class="sb-item" id="nav-progress"  onclick="UI.go('progress');UI.sidebarClose()"><div class="sb-ic">📊</div>Progress</div>
-        <div class="sb-item" id="nav-offline"   onclick="UI.go('offline');UI.sidebarClose()"><div class="sb-ic">📦</div>Offline Cache</div>
+        <div class="sb-item" id="nav-timetable" onclick="UI.go('timetable')"><div class="sb-ic">📅</div>Timetable</div>
+        <div class="sb-item" id="nav-progress"  onclick="UI.go('progress')"><div class="sb-ic">📊</div>Progress</div>
+        <div class="sb-item" id="nav-offline"   onclick="UI.go('offline')"><div class="sb-ic">📦</div>Offline Cache</div>
       </div>
     </div>
 
@@ -484,13 +452,20 @@ input[type=file]:hover{border-color:var(--amb)}
           </div>
           <div class="hero-icon" id="greeting-icon">🌅</div>
         </div>
+        <div class="daily-card">
+          <div class="daily-top"><h3>🌟 Daily Challenge</h3><div class="stk-tag" id="stk-tag">🔥 0 day streak</div></div>
+          <div class="sk-bar" id="sk-bar"></div>
+          <p class="daily-desc">30 mixed questions every day — keep the streak alive!</p>
+          <button class="daily-btn" onclick="QUIZ.daily()">🚀 Start Today's Challenge</button>
+        </div>
+        <div class="sb-lbl" style="margin-bottom:.4rem">Today's Overview</div>
         <div class="stats-row">
           <div class="scard sc-c"><div class="sv tcy" id="hs-tot">0</div><div class="sl">Answered</div></div>
           <div class="scard sc-g"><div class="sv tc2" id="hs-cor">0</div><div class="sl">Correct</div></div>
           <div class="scard sc-r"><div class="sv tb2" id="hs-wrg">0</div><div class="sl">Wrong</div></div>
           <div class="scard sc-a"><div class="sv ta2" id="hs-pct">0%</div><div class="sl">Accuracy</div></div>
         </div>
-        <div class="time-track" id="time-track">⏱️ Today: <span id="study-today">0m</span> · Total: <span id="study-total">0m</span></div>
+        <div class="sb-lbl" style="margin:.7rem 0 .4rem">Quick Actions</div>
         <div class="qa-row">
           <button class="qa-tile qt-sky" onclick="UI.go('online')"><span class="qa-ic">☁️</span>Online Study</button>
           <button class="qa-tile qt-vio" onclick="UI.go('psycho')"><span class="qa-ic">⚡</span>Psycho Mode</button>
@@ -498,12 +473,6 @@ input[type=file]:hover{border-color:var(--amb)}
           <button class="qa-tile qt-grn" onclick="UI.go('bookmarks')"><span class="qa-ic">⭐</span>Bookmarks</button>
           <button class="qa-tile qt-amb" onclick="UI.go('timetable')"><span class="qa-ic">📅</span>Timetable</button>
           <button class="qa-tile qt-sky" onclick="UI.go('progress')"><span class="qa-ic">📊</span>Progress</button>
-        </div>
-        <div class="daily-card">
-          <div class="daily-top"><h3>🌟 Daily Challenge</h3><div class="stk-tag" id="stk-tag">🔥 0 day streak</div></div>
-          <div class="sk-bar" id="sk-bar"></div>
-          <p class="daily-desc">30 mixed questions every day — keep the streak alive!</p>
-          <button class="daily-btn" onclick="QUIZ.daily()">🚀 Start Today's Challenge</button>
         </div>
         <div class="dash-lower">
           <div class="card"><div class="card-hd"><h3>📈 Recent Sessions</h3></div><div id="recent-sessions"></div></div>
@@ -513,9 +482,6 @@ input[type=file]:hover{border-color:var(--amb)}
             <div class="home-date" id="hdate"></div>
             <div id="h-session"></div>
           </div>
-        </div>
-        <div class="predict-card" id="predict-widget">
-          <div class="empty"><div class="empty-i">🔮</div><p>Complete 3+ quizzes to see your prediction</p></div>
         </div>
       </div>
 
@@ -532,10 +498,6 @@ input[type=file]:hover{border-color:var(--amb)}
           <select class="sel-c" id="on-ch" disabled onchange="ON.onCh()"><option>📘 Select Chapter…</option></select>
           <select class="sel-c" id="on-to" disabled><option>📑 Select Subtopic…</option></select>
           <hr>
-          <div class="shuf-row">
-            <span class="shuf-lbl">🔀 Shuffle questions & options</span>
-            <div class="toggle-switch on" id="on-shuf" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
-          </div>
           <div class="bg">
             <button class="btn btn-g btn-lg" style="flex:1" onclick="ON.start('flashcard')">🏋 Practice / Flashcard</button>
             <button class="btn btn-a btn-lg" style="flex:1" onclick="ON.start('exam')">📝 Exam Mode</button>
@@ -552,10 +514,6 @@ input[type=file]:hover{border-color:var(--amb)}
           <input type="file" id="loc-file" accept=".json" onchange="LOC.onFile()">
           <div id="loc-info" style="font-size:.72rem;color:var(--grn);margin:.42rem 0;display:none"></div>
           <hr>
-          <div class="shuf-row">
-            <span class="shuf-lbl">🔀 Shuffle questions & options</span>
-            <div class="toggle-switch on" id="loc-shuf" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
-          </div>
           <div class="bg">
             <button class="btn btn-g btn-lg" id="loc-pr" disabled style="flex:1" onclick="LOC.start('flashcard')">🏋 Practice</button>
             <button class="btn btn-a btn-lg" id="loc-ex" disabled style="flex:1" onclick="LOC.start('exam')">📝 Exam</button>
@@ -574,10 +532,6 @@ input[type=file]:hover{border-color:var(--amb)}
           <div id="psy-levels"></div>
           <div id="psy-info" style="font-size:.7rem;color:var(--t3);text-align:center;margin:.36rem 0"></div>
           <hr>
-          <div class="shuf-row">
-            <span class="shuf-lbl">🔀 Shuffle questions & options</span>
-            <div class="toggle-switch on" id="psy-shuf" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
-          </div>
           <div class="g2" style="margin-bottom:.42rem">
             <button class="btn btn-p btn-lg" onclick="PSY.start('flashcard')">⚡ Flashcard Mix</button>
             <button class="btn btn-a btn-lg" onclick="PSY.start('exam')">🎲 Exam 100 Qs</button>
@@ -586,39 +540,33 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- BOOKMARKS — WITH TAG FILTER -->
+      <!-- BOOKMARKS -->
       <div class="view" id="view-bookmarks">
         <div class="ph"><h2>⭐ Bookmarks</h2><p>Questions saved for focused revision</p></div>
         <div class="card"><div class="card-hd"><h3>Saved Questions</h3>
           <div class="bg"><button class="btn btn-sm btn-a" onclick="REV.start('bk','flashcard')">⚡ Flash</button><button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="REV.start('bk','exam')">📝 Exam</button><button class="btn btn-sm btn-r" onclick="REV.clearAll('bk')">🗑</button></div>
-        </div>
-        <div id="bk-tag-filter"></div>
-        <div id="bk-list"></div>
+        </div><div id="bk-list"></div></div>
       </div>
 
-      <!-- FLAGGED — WITH TAG FILTER -->
+      <!-- FLAGGED -->
       <div class="view" id="view-flagged">
         <div class="ph"><h2>🚩 Flagged</h2><p>Questions marked for follow-up</p></div>
         <div class="card"><div class="card-hd"><h3>Flagged Questions</h3>
           <div class="bg"><button class="btn btn-sm btn-a" onclick="REV.start('fl','flashcard')">⚡ Flash</button><button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="REV.start('fl','exam')">📝 Exam</button><button class="btn btn-sm btn-r" onclick="REV.clearAll('fl')">🗑</button></div>
-        </div>
-        <div id="fl-tag-filter"></div>
-        <div id="fl-list"></div>
+        </div><div id="fl-list"></div></div>
       </div>
 
-      <!-- WRONG BANK — WITH TAG FILTER -->
+      <!-- WRONG BANK -->
       <div class="view" id="view-wrong">
         <div class="ph"><h2>❌ Wrong Bank</h2><p>Every question you got wrong — retry to master them</p></div>
         <div class="card"><div class="card-hd"><h3>Wrong Answers</h3>
           <div class="bg"><button class="btn btn-sm btn-p" onclick="REV.start('wr','flashcard')">⚡ Retry Flash</button><button class="btn btn-sm btn-a" onclick="REV.start('wr','exam')">📝 Retry Exam</button><button class="btn btn-sm btn-r" onclick="REV.clearAll('wr')">🗑 Clear</button></div>
-        </div>
-        <div id="wr-tag-filter"></div>
-        <div id="wr-list"></div>
+        </div><div id="wr-list"></div></div>
       </div>
 
-      <!-- TIMETABLE — RECURRING ADDED, NOTIFICATIONS REMOVED -->
+      <!-- TIMETABLE -->
       <div class="view" id="view-timetable">
-        <div class="ph"><h2>📅 Timetable</h2><p>Plan sessions · recurring weekly</p></div>
+        <div class="ph"><h2>📅 Timetable</h2><p>Plan your weekly study sessions</p></div>
         <div class="g2" style="align-items:start">
           <div>
             <div class="card"><div class="tt-clock" id="tt-clock">00:00:00</div><div class="tt-date" id="tt-date"></div><div id="tt-now"></div></div>
@@ -632,10 +580,6 @@ input[type=file]:hover{border-color:var(--amb)}
                 <select id="tt-day"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select>
                 <input type="text" id="tt-name" placeholder="Session name">
                 <div class="g2"><input type="time" id="tt-s"><input type="time" id="tt-e"></div>
-                <div style="display:flex;align-items:center;gap:.5rem;margin:.3rem 0">
-                  <input type="checkbox" id="tt-recurring" style="accent-color:var(--amb);width:16px;height:16px;cursor:pointer">
-                  <label for="tt-recurring" style="font-size:.76rem;color:var(--t2);cursor:pointer;font-weight:500">🔄 Recurring weekly</label>
-                </div>
                 <button class="btn btn-a btn-blk" style="margin-top:.38rem" onclick="TT.add()">+ Add Session</button>
               </div>
             </div>
@@ -644,13 +588,10 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- PROGRESS — WITH PREDICTION -->
+      <!-- PROGRESS -->
       <div class="view" id="view-progress">
         <div class="ph"><h2>📊 Progress</h2><p>Overall performance &amp; chapter breakdown</p></div>
         <div class="g4" id="prog-stats" style="margin-bottom:.85rem"></div>
-        <div class="predict-card" id="predict-widget-prog">
-          <div class="empty"><div class="empty-i">🔮</div><p>Complete 3+ quizzes to see your prediction</p></div>
-        </div>
         <div class="card"><div class="card-hd"><h3>Chapter Accuracy</h3><span class="ctag tp">Breakdown</span></div><div id="chap-acc"></div></div>
         <div class="card"><div class="card-hd"><h3>Data Management</h3><span class="ctag tr">Backup</span></div>
           <div class="bg">
@@ -682,7 +623,7 @@ input[type=file]:hover{border-color:var(--amb)}
       <!-- QUIZ WRAPPER -->
       <div id="quiz-wrap" style="display:none">
 
-        <!-- FLASHCARD — WITH TAGS + AI EXPLANATION -->
+        <!-- FLASHCARD -->
         <div id="fc-wrap">
           <div class="qbar">
             <div class="qb-l1"><span class="qb-pill" id="fc-mode-pill">⚡ Flash</span><span class="qb-topic" id="fc-chip">Topic</span></div>
@@ -701,16 +642,14 @@ input[type=file]:hover{border-color:var(--amb)}
             <div class="qm">
               <span class="qn mono" id="fc-qn">#1</span>
               <div class="fc-acts" id="fc-acts">
-                <button class="ib" title="Bookmark" onclick="QUIZ._star()">⭐</button>
-                <button class="ib" title="Flag" onclick="QUIZ._flag()">🚩</button>
+                <button class="ib" title="Bookmark" onclick="QUIZ.bk()">⭐</button>
+                <button class="ib" title="Flag" onclick="QUIZ.fl()">🚩</button>
                 <button class="ib" title="Search (Ctrl+F)" onclick="SRCH.toggle()">🔍</button>
               </div>
             </div>
             <div class="qt" id="fc-q">Loading question…</div>
-            <div id="fc-tags" class="tag-bar"></div>
             <div id="fc-opts"></div>
             <div class="expl" id="fc-expl"></div>
-            
             <div class="srch-panel" id="fc-srch">
               <div class="srch-row"><input class="srch-inp" id="fc-srch-q" type="text" placeholder="Question + options pre-filled — edit or search…" onkeydown="if(event.key==='Enter')SRCH.go()"><button class="srch-go" onclick="SRCH.go()">🔍</button></div>
               <div class="srch-links" id="fc-srch-links"></div>
@@ -718,12 +657,12 @@ input[type=file]:hover{border-color:var(--amb)}
           </div>
           <div class="fc-nav">
             <button class="btn btn-a" id="fc-prev" onclick="QUIZ.fcNav(-1)">← Prev</button>
-            <span class="fc-hint" id="fc-hint">Tap an option or press A/B/C/D</span>
+            <span class="fc-hint" id="fc-hint">Tap an option to answer</span>
             <button class="btn btn-a" id="fc-next" onclick="QUIZ.fcNav(1)">Next →</button>
           </div>
         </div>
 
-        <!-- EXAM — GOOGLE SEARCH ONLY -->
+        <!-- EXAM -->
         <div id="ex-wrap" style="display:none">
           <div class="qbar">
             <div class="qb-l1"><span class="qb-pill" id="ex-mode-pill">📝 Exam</span><span class="qb-topic" id="ex-chip">Exam</span></div>
@@ -760,7 +699,7 @@ input[type=file]:hover{border-color:var(--amb)}
     </div><!-- /main -->
   </div><!-- /layout -->
 
-  <!-- MOBILE BOTTOM NAV — REDESIGNED -->
+  <!-- MOBILE BOTTOM NAV -->
   <nav id="bnav">
     <button class="bn-item active" id="bn-home"     onclick="UI.go('home');_bnav('home')"><div class="bn-ic">🏠</div>Home</button>
     <button class="bn-item"        id="bn-online"   onclick="UI.go('online');_bnav('online')"><div class="bn-ic">☁️</div>Study</button>
@@ -780,114 +719,175 @@ input[type=file]:hover{border-color:var(--amb)}
   </div>
 </div>
 
-
-<!-- Core app scripts -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script src="chapters-data.js"></script>
 <script src="app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-
-<!-- PWA v2.0 Features -->
-<div id="install-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:linear-gradient(135deg,#D4880F,#F5A623);padding:.85rem 1rem;box-shadow:0 4px 20px rgba(245,166,35,.4);animation:slideDown .4s cubic-bezier(.34,1.56,.64,1);border-bottom:1px solid rgba(255,255,255,.2)">
-  <div style="display:flex;align-items:center;justify-content:space-between;max-width:800px;margin:0 auto;gap:1rem">
-    <div style="display:flex;align-items:center;gap:.7rem">
-      <div style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.4rem">🔥</div>
-      <div>
-        <div style="font-family:var(--fd);font-weight:700;color:#0F0A00;font-size:.9rem">Install HAMRO AFNAI</div>
-        <div style="font-size:.72rem;color:rgba(15,10,0,.7);font-weight:500">Study offline · Faster loading · App-like experience</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:.4rem;flex-shrink:0">
-      <button onclick="PWA.dismissInstall()" style="padding:.45rem .8rem;background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#0F0A00;font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--ff)">Not Now</button>
-      <button onclick="PWA.install()" style="padding:.45rem .8rem;background:#0F0A00;border:none;border-radius:8px;color:#F5A623;font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--ff);box-shadow:0 2px 8px rgba(0,0,0,.3)">Install App →</button>
-    </div>
-  </div>
-</div>
-<style>@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}</style>
-
-<div id="ios-install-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1.5rem">
-  <div style="background:var(--c2);border:1px solid var(--b2);border-radius:var(--r4);max-width:380px;width:100%;padding:1.5rem;box-shadow:var(--sh3)">
-    <div style="text-align:center;margin-bottom:1rem">
-      <div style="font-size:3rem;margin-bottom:.3rem">📲</div>
-      <h3 style="font-family:var(--fd);font-size:1.1rem;font-weight:700;color:var(--t1)">Add to Home Screen</h3>
-      <p style="font-size:.76rem;color:var(--t3);margin-top:.3rem">Install on your iPhone/iPad for the best experience</p>
-    </div>
-    <div style="background:var(--c1);border:1px solid var(--b1);border-radius:var(--r2);padding:1rem;margin-bottom:1rem">
-      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem"><div style="width:28px;height:28px;border-radius:50%;background:var(--amb);color:#000;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0">1</div><div style="font-size:.78rem;color:var(--t2)">Tap the <strong style="color:var(--t1)">Share</strong> button <span style="font-size:1rem">⎋</span> in Safari's toolbar</div></div>
-      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem"><div style="width:28px;height:28px;border-radius:50%;background:var(--amb);color:#000;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0">2</div><div style="font-size:.78rem;color:var(--t2)">Scroll down and tap <strong style="color:var(--t1)">Add to Home Screen</strong></div></div>
-      <div style="display:flex;align-items:center;gap:.7rem"><div style="width:28px;height:28px;border-radius:50%;background:var(--amb);color:#000;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0">3</div><div style="font-size:.78rem;color:var(--t2)">Tap <strong style="color:var(--t1)">Add</strong> in the top right corner</div></div>
-    </div>
-    <button onclick="document.getElementById('ios-install-modal').style.display='none';localStorage.setItem('ha_ios_dismissed','1')" style="width:100%;padding:.65rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:#0F0A00;font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">Got it!</button>
-  </div>
-</div>
-
-<div id="update-toast" style="display:none;position:fixed;bottom:calc(var(--bn-h) + 1rem + var(--safe-b));left:50%;transform:translateX(-50%);z-index:9001;background:linear-gradient(135deg,var(--grn),var(--teal));border-radius:var(--r2);padding:.55rem 1.2rem;font-size:.78rem;font-weight:700;color:#fff;box-shadow:0 4px 20px rgba(34,197,94,.4);cursor:pointer;animation:tin .3s var(--spring);white-space:nowrap" onclick="location.reload()">🔄 New version available — Tap to update</div>
-
-<div id="shortcuts-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:1rem">
-  <div style="background:var(--c2);border:1px solid var(--b2);border-radius:var(--r4);max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:var(--sh3)">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem .6rem;border-bottom:1px solid var(--b1)">
-      <h3 style="font-family:var(--fd);font-size:.9rem;font-weight:700">⌨️ Keyboard Shortcuts</h3>
-      <button onclick="document.getElementById('shortcuts-modal').style.display='none'" style="background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2)">✕</button>
-    </div>
-    <div style="padding:1rem">
-      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.5rem">Navigation</div>
-      <div style="display:grid;gap:.35rem;margin-bottom:1rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Dashboard</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Ctrl+1</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Online Study</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Ctrl+2</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Progress</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Ctrl+3</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Refresh</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Ctrl+R</kbd></div>
-      </div>
-      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.5rem">Quiz</div>
-      <div style="display:grid;gap:.35rem;margin-bottom:1rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Answer 1-5</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">1 2 3 4 5</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Answer A/B/C/D</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">A B C D E</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Next / Prev</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">→ ←</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Search</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Ctrl+F</kbd></div>
-      </div>
-      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.5rem">Global</div>
-      <div style="display:grid;gap:.35rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">Close / Escape</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Esc</kbd></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:var(--b0);border-radius:var(--r1);font-size:.76rem"><span style="color:var(--t2)">This Help</span><kbd style="background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.15rem .4rem;font-family:var(--fm);font-size:.65rem;color:var(--t1)">Shift+?</kbd></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="offline-fallback" style="display:none;position:fixed;inset:0;z-index:9998;background:var(--c0);flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center">
-  <div style="font-size:4rem;margin-bottom:1rem">📡</div>
-  <h2 style="font-family:var(--fd);font-size:1.2rem;font-weight:700;color:var(--t1);margin-bottom:.5rem">You're Offline</h2>
-  <p style="font-size:.8rem;color:var(--t3);max-width:300px;line-height:1.6;margin-bottom:1.5rem">No internet connection detected.</p>
-  <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">
-    <button onclick="document.getElementById('offline-fallback').style.display='none'" style="padding:.55rem 1rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--ff)">Continue Offline</button>
-    <button onclick="location.reload()" style="padding:.55rem 1rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:#0F0A00;font-size:.78rem;font-weight:700;cursor:pointer;font-family:var(--ff)">🔄 Retry</button>
-  </div>
-</div>
-
-<div class="swipe-hint" id="swipe-hint">SWIPE →</div>
-
 <script>
-/* ── Swipe-to-open sidebar (mobile) ── */
-let _swipeStart = null;
-document.addEventListener('touchstart', e=>{
-  if(e.touches[0].clientX < 30) _swipeStart = e.touches[0].clientX;
-});
-document.addEventListener('touchend', e=>{
-  if(_swipeStart!==null && e.changedTouches[0].clientX > 80) {
-    UI.sidebarOpen(); _swipeStart=null;
+/* ════════════════════════════════════════════════════════════
+   PATCH LAYER v2 — HAMRO AFNAI 2.0
+   Contracts with app.js (IDs must NOT change):
+     fc-chip, fc-ctr, fc-ok, fc-bad, fc-skip, fc-pf, fc-tmr
+     ex-chip, ex-ctr, ex-ans, ex-pf, ex-tmr
+     rg rr rs (result bars)
+════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+const $   = id => document.getElementById(id);
+const set = (id,v) => { const e=$(id); if(e) e.textContent=v; };
+const htm = (id,v) => { const e=$(id); if(e) e.innerHTML=v; };
+
+/* 1. Stat tiles now emit plain numbers from app.js — no stripping needed */
+function _watchTiles(){ /* no-op: app.js now emits plain numbers directly */ }
+
+/* 2. Clean emoji chip prefix */
+function _cleanChip(id){ const e=$(id); if(!e)return; e.textContent=e.textContent.replace(/^[⚡📝🌟❌⭐🚩🎯]\s*/,'').trim(); }
+
+/* 3. Styled counter */
+function _ctr(id,cur,tot){ const e=$(id); if(!e)return; e.innerHTML=cur+'<em>/'+tot+'</em>'; }
+
+/* 4. Patch _renderFlashcard */
+const _rf = QUIZ._renderFlashcard.bind(QUIZ);
+QUIZ._renderFlashcard = function(){
+  _rf(); _watchTiles(); _cleanChip('fc-chip');
+  if(S.quiz.qs) _ctr('fc-ctr', S.quiz.idx+1, S.quiz.qs.length);
+  _srchFill(); // app.js renders search as button directly now
+};
+
+/* 5. Patch _updateFcCounts */
+const _uc = QUIZ._updateFcCounts.bind(QUIZ);
+QUIZ._updateFcCounts = function(){
+  _uc(); _watchTiles();
+  if(S.quiz.qs){ const pf=$('fc-pf'); if(pf) pf.style.width=((S.quiz.idx/S.quiz.qs.length)*100)+'%'; }
+};
+
+/* 6. Patch startWith */
+const _sw = QUIZ.startWith.bind(QUIZ);
+QUIZ.startWith = function(qs,mode,ch){
+  _sw(qs,mode,ch);
+  const nm=(ch||'Quiz').replace(/^[⚡📝🌟❌⭐🚩🎯]\s*/,'').trim();
+  set('fc-chip',nm); set('ex-chip',nm);
+  set('fc-mode-pill', mode==='exam'?'📝 Exam':'⚡ Flash');
+  set('ex-mode-pill','📝 Exam');
+  _ctr('fc-ctr',1,qs.length); _ctr('ex-ctr',0,qs.length);
+  _watchTiles();
+};
+
+/* 7. Patch _renderExam */
+const _re = QUIZ._renderExam.bind(QUIZ);
+QUIZ._renderExam = function(){ _re(); _cleanChip('ex-chip'); _ctr('ex-ctr',0,S.quiz.qs.length); };
+
+/* 8. Patch exAnswer */
+const _ea = QUIZ.exAnswer.bind(QUIZ);
+QUIZ.exAnswer = function(qi,oi){
+  _ea(qi,oi); _watchTiles();
+  const ans=S.quiz.ans.filter(a=>a!==null).length, tot=S.quiz.qs.length;
+  _ctr('ex-ctr',ans,tot);
+  const pf=$('ex-pf'); if(pf) pf.style.width=((ans/tot)*100)+'%';
+  const t=$('ex-tmr'); if(t) t.classList.toggle('urgent',S.quiz.left<tot*18);
+};
+
+/* 9. Timer urgent */
+const _st = QUIZ._startTimer.bind(QUIZ);
+QUIZ._startTimer = function(){
+  _st();
+  const w=setInterval(()=>{
+    if(!S.quiz?.active){clearInterval(w);return;}
+    if(S.quiz.mode==='exam'){ const t=$('ex-tmr'); if(t) t.classList.toggle('urgent',S.quiz.left<S.quiz.qs.length*18); }
+  },1000);
+};
+
+/* 10. Search engine */
+function _srchFill(){
+  const q=S.quiz?.qs?.[S.quiz.idx]; if(!q)return;
+  const opts=(q.options||[]).map((o,i)=>String.fromCharCode(65+i)+') '+o).join('  ');
+  const inp=$('fc-srch-q'); if(inp) inp.value=(q.q+'  '+opts).trim();
+}
+window.SRCH={
+  toggle(){
+    const p=$('fc-srch'); if(!p)return;
+    const open=p.classList.toggle('open');
+    if(open) _srchFill(); else htm('fc-srch-links','');
+  },
+  go(){
+    const inp=$('fc-srch-q'); if(!inp)return;
+    const q=encodeURIComponent(inp.value.trim()); if(!q){SRCH.toggle();return;}
+    htm('fc-srch-links',
+      `<a class="sl sl-g" href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">🔍 Google</a>`
+    );
   }
+};
+
+/* 11. Dashboard rendering now native in app.js HOME.render */
+
+/* 12. REV list rendering now native in app.js REV.renderList */
+
+/* 13. Swipe right → sidebar */
+let _tx=0,_ty=0;
+document.addEventListener('touchstart',e=>{_tx=e.touches[0].clientX;_ty=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-_tx,dy=Math.abs(e.changedTouches[0].clientY-_ty);if(_tx<22&&dx>60&&dy<70)UI.sidebarToggle();},{passive:true});
+
+/* 14. Keyboard shortcuts */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    UI.sidebarClose();
+    const mb=$('mbg');if(mb?.classList.contains('show'))closeMod();
+    const sp=$('fc-srch');if(sp?.classList.contains('open')){sp.classList.remove('open');}
+    return;
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='f'&&S.quiz?.active&&S.quiz?.mode!=='exam'){e.preventDefault();SRCH.toggle();}
 });
 
-/* ── BOTTOM NAV HELPERS ── */
+/* 15. PWA install — show a one-tap banner the moment the browser
+   offers it, instead of only a small hidden toolbar icon. */
+function _showInstallBanner(){
+  if($('pwa-install-banner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'pwa-install-banner';
+  bar.style.cssText = 'position:fixed;left:.75rem;right:.75rem;bottom:calc(var(--bn-h,0px) + .75rem + var(--safe-b,0px));background:var(--c2);border:1px solid var(--bd);border-radius:var(--r2);padding:.7rem .9rem;display:flex;align-items:center;gap:.6rem;z-index:9997;box-shadow:var(--sh3)';
+  bar.innerHTML = `
+    <div style="font-size:1.3rem">📲</div>
+    <div style="flex:1;font-size:.76rem;color:var(--t2);line-height:1.3">Install this app for faster, offline access</div>
+    <button id="pwa-install-go" style="padding:.4rem .75rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r1);color:#0F0A00;font-weight:700;font-size:.76rem;cursor:pointer;font-family:var(--ff)">Install</button>
+    <button id="pwa-install-x" style="background:none;border:none;color:var(--t3);font-size:.9rem;cursor:pointer;padding:.2rem">✕</button>
+  `;
+  document.body.appendChild(bar);
+  $('pwa-install-go').onclick = ()=>{
+    if(window._dpi){ window._dpi.prompt(); window._dpi.userChoice.then(()=>{ window._dpi=null; }); }
+    bar.remove();
+  };
+  $('pwa-install-x').onclick = ()=> bar.remove();
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); window._dpi=e;
+  const b=$('installBtn'); if(b){b.style.display='';b.title='Install App';}
+  _showInstallBanner();
+});
+window.addEventListener('appinstalled',()=>{
+  window._dpi=null; const b=$('installBtn'); if(b) b.style.display='none';
+  const bar=$('pwa-install-banner'); if(bar) bar.remove();
+  if(typeof toast==='function') toast('📲 App installed successfully!');
+});
+const _origInstall=PWA.install.bind(PWA);
+PWA.install=function(){
+  if(window._dpi){window._dpi.prompt();window._dpi.userChoice.then(()=>{window._dpi=null;});return;}
+  _origInstall();
+};
+
+/* 16. Bottom nav helpers */
 window._bnav=function(id){
   document.querySelectorAll('.bn-item').forEach(e=>e.classList.remove('active'));
-  const b=document.getElementById('bn-'+id); if(b) b.classList.add('active');
+  const b=$('bn-'+id); if(b) b.classList.add('active');
 };
+
+/* Hook UI.go to sync bottom nav */
 const _uigo=UI.go.bind(UI);
 UI.go=function(v){
   _uigo(v);
   const ids=['home','online','psycho','progress'];
   document.querySelectorAll('.bn-item').forEach(e=>e.classList.remove('active'));
-  if(ids.includes(v)){ const b=document.getElementById('bn-'+v); if(b) b.classList.add('active'); }
+  if(ids.includes(v)){ const b=$('bn-'+v); if(b) b.classList.add('active'); }
 };
+
 window._bnavMore=function(){
   openMod('More', `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.42rem;padding:.1rem 0">
@@ -896,52 +896,7 @@ window._bnavMore=function(){
   `);
 };
 
-/* ── INIT ── */
-document.addEventListener('DOMContentLoaded', () => {
-  PWA.init();
-  SW_UPDATE.init();
-  AUTH.init();
-  NET.updateUI();
-  // Admin button for admin users
-  if(S.user?.role==='admin') {
-    const adm=document.createElement('button');
-    adm.className='tb-btn amber'; adm.textContent='👑';
-    adm.title='Admin Panel'; adm.onclick=()=>ADMIN.open();
-    document.querySelector('.tb-r').insertBefore(adm, document.querySelector('.tb-r').firstChild);
-  }
-});
-
-/* ── QUIZ VISIBILITY FIX ── */
-/* Ensure quiz wrapper displays fully when active */
-const _origQuizShow = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style');
-/* Patch QUIZ._doStart to add proper classes */
-const _quizDoStart = QUIZ._doStart;
-QUIZ._doStart = function(qsArr, mode, chapterName, doShuffle) {
-  const main = document.getElementById('main');
-  if(main) main.classList.add('quiz-active');
-  const qw = document.getElementById('quiz-wrap');
-  if(qw) qw.classList.add('on');
-  return _quizDoStart.call(this, qsArr, mode, chapterName, doShuffle);
-};
-/* Patch quiz quit/finish to remove classes */
-const _quizQuit = QUIZ.quit;
-QUIZ.quit = function() {
-  QUIZ._exitGuard(()=>{
-    const main = document.getElementById('main');
-    if(main) main.classList.remove('quiz-active');
-    const qw = document.getElementById('quiz-wrap');
-    if(qw) qw.classList.remove('on');
-    UI._goRaw('home');
-  });
-};
-const _quizShowResults = QUIZ._showResults;
-QUIZ._showResults = function() {
-  const main = document.getElementById('main');
-  if(main) main.classList.remove('quiz-active');
-  const qw = document.getElementById('quiz-wrap');
-  if(qw) qw.classList.remove('on');
-  return _quizShowResults.call(this);
-};
+})();
 </script>
 </body>
 </html>

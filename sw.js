@@ -5,12 +5,12 @@
    • API/Drive  → network-first, offline JSON fallback
 ═══════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'ha-shell-v8'; // Bumped version
+const CACHE_NAME = 'ha-shell-v7'; // Bumped version
 const SHELL = [
   './',
-  './index.html',
-  './user.html',
-  './admin.html',
+  './index.html',        // ← ADD: login gateway
+  './user.html',        // ← ADD: your main app page
+  './admin.html',       // ← ADD: admin page
   './app.js',
   './chapters-data.js',
   './manifest.json'
@@ -70,7 +70,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* ── App shell: stale-while-revalidate ── */
+  /* ── App shell: stale-while-revalidate (FIXED) ── */
   e.respondWith(
     caches.match(e.request).then(cached => {
       const fetchPromise = fetch(e.request.clone())
@@ -81,8 +81,13 @@ self.addEventListener('fetch', e => {
           }
           return res;
         })
-        .catch(() => cached || new Response('Offline', {status: 503}));
+        .catch(() => {
+          // Network failed — return cached if we have it
+          return cached || new Response('Offline', {status: 503});
+        });
 
+      // Return cached immediately (stale-while-revalidate), 
+      // or wait for network if nothing in cache
       return cached || fetchPromise;
     })
   );
