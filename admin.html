@@ -624,8 +624,7 @@ const ADMIN = {
       const tier = u.accessTier || (u.permanentAccess ? 'permanent' : u.status);
       csv.push([u.username, u.name||'', u.email||'', u.mobile||'', u.status, tier, u.createdAt||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     });
-    this.downloadCSV(csv.join('
-'), 'users_export.csv');
+    this.downloadCSV(csv.join('\n'), 'users_export.csv');
   },
 
   exportPayments() {
@@ -636,8 +635,7 @@ const ADMIN = {
     rows.forEach(p => {
       csv.push([p.username, p.name||'', p.txId, ADMIN.data.settings.paymentAmount||100, p.status, p.submittedAt||'', p.remarks||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     });
-    this.downloadCSV(csv.join('
-'), 'payments_export.csv');
+    this.downloadCSV(csv.join('\n'), 'payments_export.csv');
   },
 
   downloadCSV(content, filename) {
