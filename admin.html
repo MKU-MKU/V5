@@ -373,7 +373,15 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
         <div class="card">
           <div class="card-hd"><h3>Payment Configuration</h3></div>
           <div class="sf"><label>App Name</label><input type="text" id="set-name" placeholder="HAMRO AFNAI"></div>
-          <div class="sf"><label>QR Code Image URL</label><input type="text" id="set-qr" placeholder="https://drive.google.com/uc?export=view&id=..."></div>
+          <div class="sf">
+            <label>Payment QR Code</label>
+            <input type="file" id="set-qr-file" accept="image/*" onchange="SETTINGS.onQrFile(event)">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-top:.5rem">
+              <img id="set-qr-preview" style="display:none;width:90px;height:90px;object-fit:contain;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:#fff">
+              <span id="set-qr-status" style="font-size:.85rem;opacity:.7">No QR uploaded yet</span>
+            </div>
+            <input type="hidden" id="set-qr">
+          </div>
           <div class="sf"><label>Contact Phone</label><input type="text" id="set-phone" placeholder="9863200285"></div>
           <div class="sf"><label>Payment Amount (Rs)</label><input type="number" id="set-amount" placeholder="100" min="1"></div>
           <div class="sf"><label>Payment Instructions</label><textarea id="set-inst" placeholder="Instructions shown to users…"></textarea></div>
@@ -432,6 +440,13 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwAhfyQm7NvxaNjgRm3oC9S
 // ═══════════════════════════════════════════════════════════════
 // ADMIN CORE
 // ═══════════════════════════════════════════════════════════════
+// Escapes user-supplied text before it goes into innerHTML template
+// literals. Every field below (name, email, mobile, remarks, txId, log
+// entries) originates from the public signup/payment forms, so it's
+// attacker-controlled — render it as text, never as markup. Same
+// implementation app.js already uses for the timetable.
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
 const ADMIN = {
   creds: null,
   data: {users:[], payments:[], settings:{}, logs:[]},
@@ -707,8 +722,8 @@ const USERS = {
       const checked = this.selected.has(u.username) ? 'checked' : '';
       return `<tr>
         <td><input type="checkbox" class="chk" ${checked} onchange="USERS.toggle('${u.username}')"></td>
-        <td><div style="font-weight:600;color:var(--t1);cursor:pointer" onclick="USERS.view('${u.username}')">${u.name||u.username}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${u.username}</div></td>
-        <td><div style="font-size:.72rem">${u.email||'—'}</div><div style="font-size:.68rem;color:var(--t3)">${u.mobile||'—'}</div></td>
+        <td><div style="font-weight:600;color:var(--t1);cursor:pointer" onclick="USERS.view('${u.username}')">${esc(u.name)||u.username}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${u.username}</div></td>
+        <td><div style="font-size:.72rem">${esc(u.email)||'—'}</div><div style="font-size:.68rem;color:var(--t3)">${esc(u.mobile)||'—'}</div></td>
         <td><span class="badge ${badge}">${u.status}</span></td>
         <td class="mono" style="font-size:.68rem">${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
         <td style="font-size:.72rem">${access}</td>
@@ -772,9 +787,9 @@ const USERS = {
     document.getElementById('mbody-user').innerHTML = `
       <div class="dgrid" style="margin-bottom:.8rem">
         <div class="ditem"><label>Username</label><val class="mono">${u.username}</val></div>
-        <div class="ditem"><label>Full Name</label><val>${u.name || '—'}</val></div>
-        <div class="ditem"><label>Email</label><val>${u.email || '—'}</val></div>
-        <div class="ditem"><label>Mobile</label><val>${u.mobile || '—'}</val></div>
+        <div class="ditem"><label>Full Name</label><val>${esc(u.name) || '—'}</val></div>
+        <div class="ditem"><label>Email</label><val>${esc(u.email) || '—'}</val></div>
+        <div class="ditem"><label>Mobile</label><val>${esc(u.mobile) || '—'}</val></div>
         <div class="ditem"><label>Status</label><val><span class="badge ${badge}">${u.status}</span></val></div>
         <div class="ditem"><label>Access Type</label><val>${access}</val></div>
         <div class="ditem"><label>Created</label><val>${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</val></div>
@@ -782,10 +797,10 @@ const USERS = {
       </div>
       ${pay ? `<div style="background:var(--b0);border-radius:var(--r1);padding:.6rem;border:1px solid var(--b1);margin-bottom:.8rem">
         <div style="font-size:.62rem;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-bottom:.3rem">Payment Info</div>
-        <div style="font-size:.78rem">TXN ID: <span class="mono">${pay.txId}</span></div>
+        <div style="font-size:.78rem">TXN ID: <span class="mono">${esc(pay.txId)}</span></div>
         <div style="font-size:.78rem">Status: <span class="badge ${pay.status==='pending'?'badge-pending':pay.status==='verified'?'badge-verified':'badge-rejected'}">${pay.status}</span></div>
-        ${pay.remarks ? `<div style="font-size:.76rem;color:var(--t3);margin-top:.2rem">Remarks: ${pay.remarks}</div>` : ''}
-        ${pay.screenshotUrl ? `<a href="${pay.screenshotUrl}" target="_blank" style="color:var(--sky);font-size:.76rem">View Screenshot →</a>` : ''}
+        ${pay.remarks ? `<div style="font-size:.76rem;color:var(--t3);margin-top:.2rem">Remarks: ${esc(pay.remarks)}</div>` : ''}
+        ${pay.screenshotUrl && pay.screenshotUrl.startsWith('http') ? `<a href="${esc(pay.screenshotUrl)}" target="_blank" rel="noopener" style="color:var(--sky);font-size:.76rem">View Screenshot →</a>` : ''}
       </div>` : '<div style="font-size:.76rem;color:var(--t3);margin-bottom:.8rem">No payment record found.</div>'}
       <div style="background:var(--b0);border-radius:var(--r1);padding:.6rem;border:1px solid var(--b1);margin-bottom:.8rem">
         <div style="font-size:.62rem;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-bottom:.4rem">Grant / Extend Access</div>
@@ -808,9 +823,9 @@ const USERS = {
     if (!u) return;
     document.getElementById('mtitle-user').textContent = 'Edit User: ' + username;
     document.getElementById('mbody-user').innerHTML = `
-      <div class="sf"><label>Full Name</label><input type="text" id="edit-name" value="${u.name||''}"></div>
-      <div class="sf"><label>Email</label><input type="email" id="edit-email" value="${u.email||''}"></div>
-      <div class="sf"><label>Mobile</label><input type="text" id="edit-mobile" value="${u.mobile||''}"></div>
+      <div class="sf"><label>Full Name</label><input type="text" id="edit-name" value="${esc(u.name)}"></div>
+      <div class="sf"><label>Email</label><input type="email" id="edit-email" value="${esc(u.email)}"></div>
+      <div class="sf"><label>Mobile</label><input type="text" id="edit-mobile" value="${esc(u.mobile)}"></div>
       <div class="sf"><label>Status</label>
         <select id="edit-status">
           <option value="trial" ${u.status==='trial'?'selected':''}>Trial</option>
@@ -910,8 +925,8 @@ const PAYMENTS = {
       const checked = this.selected.has(p.username) ? 'checked' : '';
       return `<tr>
         <td><input type="checkbox" class="chk" ${checked} onchange="PAYMENTS.toggle('${p.username}')"></td>
-        <td><div style="font-weight:600;color:var(--t1)">${p.name||p.username}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${p.username}</div></td>
-        <td class="mono">${p.txId}</td>
+        <td><div style="font-weight:600;color:var(--t1)">${esc(p.name)||p.username}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${p.username}</div></td>
+        <td class="mono">${esc(p.txId)}${p.duplicateTxId ? ` <span title="Also submitted by: ${esc(p.duplicateTxIdUsers.join(', '))}" style="color:var(--warn,#f5a623);cursor:help">⚠️</span>` : ''}</td>
         <td style="font-size:.72rem">Rs ${ADMIN.data.settings.paymentAmount||'100'}</td>
         <td><span class="badge ${badge}">${p.status}</span></td>
         <td class="mono" style="font-size:.68rem">${p.submittedAt ? new Date(p.submittedAt).toLocaleDateString() : '—'}</td>
@@ -1020,19 +1035,20 @@ const MODAL = {
     const title = action==='verified' ? 'Verify Payment' : 'Reject Payment';
     document.getElementById('mtitle-review').textContent = title;
     document.getElementById('mbody-review').innerHTML = `
+      ${p.duplicateTxId ? `<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.4);border-radius:var(--r1);padding:.6rem;margin-bottom:.8rem;font-size:.78rem;color:var(--warn,#f5a623)">⚠️ This transaction ID was also submitted by: <strong>${esc(p.duplicateTxIdUsers.join(', '))}</strong>. Double-check the screenshot before approving.</div>` : ''}
       <div style="margin-bottom:.8rem">
         <div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">User</div>
-        <div style="font-weight:600">${p.name||p.username} <span class="mono" style="font-size:.72rem;color:var(--t3)">(${p.username})</span></div>
+        <div style="font-weight:600">${esc(p.name)||p.username} <span class="mono" style="font-size:.72rem;color:var(--t3)">(${p.username})</span></div>
       </div>
       <div style="margin-bottom:.8rem">
         <div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Transaction ID</div>
-        <div class="mono" style="font-weight:600">${p.txId}</div>
+        <div class="mono" style="font-weight:600">${esc(p.txId)}</div>
       </div>
       <div style="margin-bottom:.8rem">
         <div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Remarks</div>
-        <div style="font-size:.8rem">${p.remarks||'—'}</div>
+        <div style="font-size:.8rem">${esc(p.remarks)||'—'}</div>
       </div>
-      ${p.screenshotUrl ? `<div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Screenshot</div><a href="${p.screenshotUrl}" target="_blank" style="color:var(--sky);font-size:.78rem">View Screenshot →</a></div>` : ''}
+      ${p.screenshotUrl && p.screenshotUrl.startsWith('http') ? `<div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Screenshot</div><a href="${esc(p.screenshotUrl)}" target="_blank" rel="noopener" style="color:var(--sky);font-size:.78rem">View Screenshot →</a></div>` : ''}
       ${action==='rejected' ? `<div class="sf" style="margin-bottom:.8rem"><label>Rejection Reason</label><input type="text" id="rej-reason" placeholder="Why are you rejecting this payment?"></div>` : ''}
       ${action==='verified' ? `<div class="sf" style="margin-bottom:.8rem"><label>Grant Duration</label>
         <select id="grant-duration">
@@ -1085,6 +1101,69 @@ const SETTINGS = {
     document.getElementById('set-amount').value = s.paymentAmount || '';
     document.getElementById('set-inst').value = s.paymentInstructions || '';
     document.getElementById('set-trial').value = s.trialHours || '';
+
+    const preview = document.getElementById('set-qr-preview');
+    const status = document.getElementById('set-qr-status');
+    if (s.qrCodeUrl) {
+      preview.src = s.qrCodeUrl;
+      preview.style.display = 'block';
+      status.textContent = s.qrCodeUrl.startsWith('data:image')
+        ? 'Uploaded QR on file'
+        : 'Using an external link (may fail to load for users — re-upload recommended)';
+    } else {
+      preview.style.display = 'none';
+      status.textContent = 'No QR uploaded yet';
+    }
+  },
+
+  // Old flow made admins paste a Google Drive "uc?export=view" link into
+  // set-qr directly. Those links routinely serve Drive's HTML "can't scan
+  // for viruses" interstitial instead of the image, which is exactly why
+  // the QR wasn't rendering for users (index.html's onerror silently swaps
+  // in the camera-emoji fallback). Uploading here instead resizes/compresses
+  // the image client-side and stores it as a data: URI directly in the
+  // settings sheet — it travels inside the same getSettings() JSON payload
+  // users already fetch, so there's no external host that can fail.
+  onQrFile(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const status = document.getElementById('set-qr-status');
+    status.textContent = 'Processing…';
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 500; // px — plenty for a scannable QR, keeps payload small
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff'; // flatten transparency so scanners get a clean white background
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/png');
+
+        // Settings sheet cell has a ~50k char ceiling; a 500px monochrome
+        // QR PNG is normally well under that, but guard against huge/busy
+        // source images just in case.
+        if (dataUrl.length > 45000) {
+          status.textContent = '❌ Image too complex even after resizing — try a simpler/smaller QR image.';
+          return;
+        }
+
+        document.getElementById('set-qr').value = dataUrl;
+        const preview = document.getElementById('set-qr-preview');
+        preview.src = dataUrl;
+        preview.style.display = 'block';
+        status.textContent = '✅ Ready — click Save Settings to publish';
+      };
+      img.onerror = () => { status.textContent = '❌ Could not read that image file.'; };
+      img.src = e.target.result;
+    };
+    reader.onerror = () => { status.textContent = '❌ Could not read that file.'; };
+    reader.readAsDataURL(file);
   },
 
   async save() {
@@ -1157,9 +1236,9 @@ const LOGS = {
       const time = l.timestamp ? new Date(l.timestamp).toLocaleString() : '—';
       return `<div class="log-item">
         <div class="log-time">${time}</div>
-        <div><span class="log-action">${l.action||'Action'}</span> by <strong>${l.admin||'Unknown'}</strong>
-        ${l.target ? ' → <span class="mono">' + l.target + '</span>' : ''}
-        ${l.details ? '<div style="color:var(--t3);font-size:.7rem;margin-top:.15rem">' + l.details + '</div>' : ''}</div>
+        <div><span class="log-action">${esc(l.action)||'Action'}</span> by <strong>${esc(l.admin)||'Unknown'}</strong>
+        ${l.target ? ' → <span class="mono">' + esc(l.target) + '</span>' : ''}
+        ${l.details ? '<div style="color:var(--t3);font-size:.7rem;margin-top:.15rem">' + esc(l.details) + '</div>' : ''}</div>
       </div>`;
     }).join('');
     PAGINATION.render('l-pg', ADMIN.state.lPage, totalPages, 'LOGS.goPage');

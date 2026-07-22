@@ -293,8 +293,15 @@ const APP = {
   fileData: null,
   session: null, // in-memory copy
 
-  init() {
-    this.checkNet();
+  async init() {
+    // Wait for the first ping to resolve before anything decides whether
+    // to trust the network. Previously this.checkNet() was fired without
+    // awaiting it, so resumeUserSession() -> loadPaymentUI() ran while
+    // this.online was still stuck at its default `false` — meaning
+    // returning users on the payment screen always got the stale settings
+    // cached in localStorage instead of a fresh getSettings() call, even
+    // though the backend was reachable the whole time.
+    await this.checkNet();
     setInterval(() => this.checkNet(), 15000);
 
     // Resume existing session
@@ -671,7 +678,7 @@ const APP = {
     const qr = s.qrCodeUrl || '';
     const img = document.getElementById('qr-img');
     const fb = document.getElementById('qr-fallback');
-    if (qr && qr.startsWith('http')) {
+    if (qr && (qr.startsWith('http') || qr.startsWith('data:image'))) {
       img.src = qr;
       img.style.display = 'block';
       fb.style.display = 'none';
@@ -710,6 +717,7 @@ const APP = {
     this.setLoading('btn-pay', true);
     const payload = {
       username: this.session.username,
+      token: this.session.token,
       name: this.session.name,
       email: this.session.email,
       mobile: this.session.mobile,

@@ -27,7 +27,7 @@ const USER_HEADERS = [
   "username", "passHash", "name", "email", "mobile",
   "contact", "contactType", "status", "createdAt", "approvedAt",
   "role", "trialExpiresAt", "paymentStatus", "permanentAccess",
-  "accessType", "accessExpiresAt"
+  "accessType", "accessExpiresAt", "sessionToken", "sessionTokenExpiresAt"
 ];
 
 const PAYMENT_HEADERS = [
@@ -289,12 +289,85 @@ function hashPass_(s) {
   return bytes.map(b => ((b < 0 ? b + 256 : b).toString(16)).padStart(2, "0")).join("");
 }
 
+// Plain unsalted SHA-256 (the original hashPass_ above) means two users
+// with the same password get the identical stored hash, and the whole
+// Users sheet is crackable in one pass with a rainbow table if it's ever
+// exposed. New passwords are hashed as "salt:sha256(salt+password)"
+// instead. verifyPassword_ below still accepts the old bare-hash format
+// for existing accounts and silently upgrades them to the salted format
+// on their next successful login — nobody gets locked out, and every
+// password converges to the stronger scheme over time.
+function makeSalt_() {
+  return Utilities.getUuid().replace(/-/g, "");
+}
+
+function hashPassSalted_(password, salt) {
+  return hashPass_(salt + password);
+}
+
+// Returns {ok: true/false}. On success via the legacy unsalted scheme,
+// also returns upgradedHash — the caller should write that back over the
+// stored hash so this account is on the salted scheme from now on.
+function verifyPassword_(password, storedHash) {
+  const s = String(storedHash || "");
+  const sep = s.indexOf(":");
+  if (sep === -1) {
+    if (s !== hashPass_(password)) return { ok: false };
+    const salt = makeSalt_();
+    return { ok: true, upgradedHash: salt + ":" + hashPassSalted_(password, salt) };
+  }
+  const salt = s.slice(0, sep);
+  const hash = s.slice(sep + 1);
+  return { ok: hash === hashPassSalted_(password, salt) };
+}
+
+// Session tokens live in columns 17/18 (0-indexed 16/17) of the Users
+// sheet — see USER_HEADERS. 30-day expiry matches how long the frontend
+// otherwise keeps a session cached in localStorage before requiring a
+// fresh login.
+const USER_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function issueUserToken_(sheet, rowIndex) {
+  const token = Utilities.getUuid();
+  const expires = Date.now() + USER_TOKEN_TTL_MS;
+  sheet.getRange(rowIndex, 17).setValue(token);
+  sheet.getRange(rowIndex, 18).setValue(String(expires));
+  return token;
+}
+
+// found.row is the raw row array from findUserRow_ (0-indexed) — token is
+// row[16], expiry is row[17].
+function verifyUserToken_(found, token) {
+  if (!token) return false;
+  const storedToken = found.row[16];
+  const expires = Number(found.row[17] || 0);
+  if (!storedToken || storedToken !== token) return false;
+  if (!expires || Date.now() > expires) return false;
+  return true;
+}
+
 function findUserRow_(sheet, username) {
   if (!username) return null;
   const data = sheet.getDataRange().getValues();
   const target = String(username).toLowerCase().trim();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]).toLowerCase().trim() === target) {
+      return { rowIndex: i + 1, row: data[i] };
+    }
+  }
+  return null;
+}
+
+// Generic column lookup, used by handleSignup to dedupe email/mobile —
+// findUserRow_ above only ever checked column 0 (username), so two
+// accounts could previously share the same email or phone number and
+// each grab their own fresh 24h trial.
+function findUserByField_(sheet, colIndex, value) {
+  if (!value) return null;
+  const data = sheet.getDataRange().getValues();
+  const target = String(value).toLowerCase().trim();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][colIndex]).toLowerCase().trim() === target) {
       return { rowIndex: i + 1, row: data[i] };
     }
   }
@@ -400,9 +473,14 @@ function handleLogin(p) {
 
   const row = found.row;
   const storedHash = row[1];
-  if (storedHash !== hashPass_(password)) {
+  const verify = verifyPassword_(password, storedHash);
+  if (!verify.ok) {
     return { success: false, error: "Wrong password." };
   }
+  if (verify.upgradedHash) {
+    sheet.getRange(found.rowIndex, 2).setValue(verify.upgradedHash);
+  }
+  const sessionToken = issueUserToken_(sheet, found.rowIndex);
 
   let status = row[7];
   const trialExpiresAt = row[11] ? new Date(row[11]) : null;
@@ -424,6 +502,7 @@ function handleLogin(p) {
     return {
       success: true,
       user: user,
+      token: sessionToken,
       permanentAccess: true,
       accessType: user.accessType || "permanent",
       accessExpiresAt: user.accessExpiresAt || "",
@@ -439,6 +518,7 @@ function handleLogin(p) {
     return {
       success: true,
       user: user,
+      token: sessionToken,
       isTrial: true,
       hoursLeft: hoursLeft,
       trialExpiresAt: user.trialExpiresAt,
@@ -452,6 +532,7 @@ function handleLogin(p) {
     return {
       success: true,
       user: user,
+      token: sessionToken,
       needsPayment: true,
       settings: settings.success ? settings.settings : {},
       message: "Your trial has expired. Please complete payment to continue."
@@ -462,7 +543,7 @@ function handleLogin(p) {
     return { success: false, error: "Account rejected. Contact admin." };
   }
 
-  return { success: true, user: user };
+  return { success: true, user: user, token: sessionToken };
 }
 
 function handleSignup(p) {
@@ -477,6 +558,15 @@ function handleSignup(p) {
   if (!username || !password || !name || !email || !mobile) {
     return { success: false, error: "All fields required (username, password, name, email, mobile)." };
   }
+  // admin.html renders username inside onclick="...('${username}')" handlers
+  // (see USERS.renderPage, PAYMENTS.renderPage). HTML-escaping the *display*
+  // text elsewhere doesn't protect that context — a quote or backslash in
+  // the username could still break out of the inline JS string. Locking the
+  // charset here removes that injection vector at the source, for every
+  // username that will ever exist from this point on.
+  if (!/^[a-zA-Z0-9_.-]{3,30}$/.test(username)) {
+    return { success: false, error: "Username must be 3-30 characters: letters, numbers, dots, dashes, underscores only." };
+  }
   if (password.length < 4) {
     return { success: false, error: "Password must be at least 4 characters." };
   }
@@ -488,13 +578,22 @@ function handleSignup(p) {
   if (findUserRow_(sheet, username)) {
     return { success: false, error: "Username already taken." };
   }
+  // email is column 3, mobile is column 4 in USER_HEADERS — see
+  // findUserByField_ above for why this check exists.
+  if (findUserByField_(sheet, 3, email)) {
+    return { success: false, error: "An account with this email already exists. Please log in instead." };
+  }
+  if (findUserByField_(sheet, 4, mobile)) {
+    return { success: false, error: "An account with this mobile number already exists. Please log in instead." };
+  }
 
   const now = new Date();
   const trialExpiresAt = new Date(now.getTime() + TRIAL_HOURS * 60 * 60 * 1000);
+  const salt = makeSalt_();
 
   sheet.appendRow([
     username,
-    hashPass_(password),
+    salt + ":" + hashPassSalted_(password, salt),
     name,
     email,
     mobile,
@@ -509,9 +608,13 @@ function handleSignup(p) {
     "false"               // permanentAccess
   ]);
 
+  const newRowIndex = sheet.getLastRow();
+  const sessionToken = issueUserToken_(sheet, newRowIndex);
+
   return {
     success: true,
     isTrial: true,
+    token: sessionToken,
     trialExpiresAt: trialExpiresAt.toISOString(),
     message: "Account created! You got 1-day free trial. Pay to get long-term access."
   };
@@ -524,6 +627,14 @@ function checkSession(p) {
   const sheet = getUsersSheet_();
   const found = findUserRow_(sheet, username);
   if (!found) return { success: false, error: "User not found." };
+
+  // Previously this endpoint returned full account data (email, mobile,
+  // trial/payment status) for any username with no proof of identity —
+  // the frontend has sent a token here since it was written, but nothing
+  // on this end ever checked it. That's fixed now: no valid token, no data.
+  if (!verifyUserToken_(found, p.token)) {
+    return { success: false, error: "Session expired. Please log in again.", sessionInvalid: true };
+  }
 
   const row = found.row;
   let status = row[7];
@@ -585,6 +696,14 @@ function submitPayment(p) {
   const userFound = findUserRow_(userSheet, username);
   if (!userFound) return { success: false, error: "User not found." };
 
+  // Without this, anyone could submit a payment record under someone
+  // else's username — not enough to steal their access (admin still
+  // reviews manually), but enough to spam a stranger's account into
+  // payment_pending and mess with their status.
+  if (!verifyUserToken_(userFound, p.token)) {
+    return { success: false, error: "Session expired. Please log in again.", sessionInvalid: true };
+  }
+
   const currentStatus = userFound.row[7];
   if (currentStatus !== "expired" && currentStatus !== "payment_pending" && currentStatus !== "trial") {
     return { success: false, error: "Payment not required at this time." };
@@ -645,6 +764,16 @@ function submitPayment(p) {
 function getPaymentStatus(p) {
   const username = String(p.username || "").trim();
   if (!username) return { success: false, error: "Username required." };
+
+  // This returns email/mobile/txId and a link to the payment screenshot —
+  // it needs the same proof-of-identity as checkSession, not just a
+  // matching username string.
+  const usersSheet = getUsersSheet_();
+  const userFound = findUserRow_(usersSheet, username);
+  if (!userFound) return { success: false, error: "User not found." };
+  if (!verifyUserToken_(userFound, p.token)) {
+    return { success: false, error: "Session expired. Please log in again.", sessionInvalid: true };
+  }
 
   const sheet = getPaymentsSheet_();
   const data = sheet.getDataRange().getValues();
@@ -778,19 +907,41 @@ function adminListPayments(p) {
   const sheet = getPaymentsSheet_();
   const data = sheet.getDataRange().getValues();
   const payments = [];
+
+  // Verification here is manual (admin eyeballs the screenshot), so nothing
+  // ever stopped two different usernames from submitting the exact same
+  // transaction ID — e.g. someone resubmitting a real payer's txId hoping
+  // it slips through review. We don't block it (a legit user's own retry
+  // after a rejection reuses their own txId too), just surface it so the
+  // reviewing admin can cross-check before approving.
+  const txIdOwners = {};
   for (let i = 1; i < data.length; i++) {
+    const txId = String(data[i][4] || "").trim().toLowerCase();
+    const username = String(data[i][0] || "");
+    if (!txId) continue;
+    if (!txIdOwners[txId]) txIdOwners[txId] = new Set();
+    txIdOwners[txId].add(username);
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    const txId = String(data[i][4] || "");
+    const username = String(data[i][0] || "");
+    const owners = txIdOwners[txId.trim().toLowerCase()];
+    const sharedWith = owners ? [...owners].filter(u => u !== username) : [];
     payments.push({
-      username: data[i][0],
+      username: username,
       name: data[i][1],
       email: data[i][2],
       mobile: String(data[i][3] || ""),
-      txId: data[i][4],
+      txId: txId,
       remarks: data[i][5],
       status: data[i][6],
       rejectionReason: data[i][7],
       screenshotUrl: data[i][8],
       submittedAt: data[i][9],
-      reviewedAt: data[i][10]
+      reviewedAt: data[i][10],
+      duplicateTxId: sharedWith.length > 0,
+      duplicateTxIdUsers: sharedWith
     });
   }
   return { success: true, payments };
@@ -908,7 +1059,8 @@ function adminUpdateUser(p) {
   }
   if (p.password) {
     if (String(p.password).length < 6) return { success: false, error: "Password must be at least 6 characters." };
-    sheet.getRange(found.rowIndex, 2).setValue(hashPass_(p.password));
+    const salt = makeSalt_();
+    sheet.getRange(found.rowIndex, 2).setValue(salt + ":" + hashPassSalted_(p.password, salt));
     changes.push("password reset");
   }
 
@@ -1102,6 +1254,7 @@ function testAll() {
   console.log("\n[8/10] Testing payment submission...");
   const payResult = submitPayment({
     username: "testuser",
+    token: loginExpired.token,
     name: "Test User",
     email: "test@example.com",
     mobile: "9800000000",
