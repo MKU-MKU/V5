@@ -1,20 +1,55 @@
 /* ═══════════════════════════════════════════════════════════════
-   SW.JS — HAMRO AFNAI  Service Worker  
+   SW.JS — HAMRO AFNAI  Service Worker
    Strategy:
-   • App shell  → network-first, cache only as an offline fallback
-   • API/Drive  → network-first, offline JSON fallback
+   • Admin panel      → NEVER intercepted. Always live network, no
+                         cache read/write, no manufactured offline
+                         response. A stale/offline admin panel is
+                         worse than no admin panel.
+   • index.html/shell → network-first, cache-bypass (no-store) so a
+                         live connection is never shadowed by a stale
+                         copy. Falls back to the last cached copy ONLY
+                         when the network genuinely fails — that cached
+                         index.html still boots normally and its own
+                         resumeUserSession() logic decides whether a
+                         permanent/trial user can proceed straight in,
+                         or whether to show the login screen.
+   • API/Drive        → network-first, offline JSON fallback (except
+                         admin — see above).
+   • Stale clearance  → whenever we're confirmed online again, purge
+                         any cached entries that aren't part of the
+                         current SHELL, so a reconnect never leaves old
+                         orphaned responses sitting in Cache Storage.
 ═══════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'ha-shell-v8'; // Bumped — v7's stale-while-revalidate strategy below was serving old index.html/admin.html/app.js indefinitely; this forces every existing installed copy to drop its stale cache on next activate.
+const CACHE_NAME = 'ha-shell-v9'; // Bumped for the admin-bypass + stale-clearance rework.
 const SHELL = [
   './',
-  './index.html',        // ← ADD: login gateway
-  './user.html',        // ← ADD: your main app page
-  './admin.html',       // ← ADD: admin page
+  './index.html',
+  './user.html',
   './app.js',
   './chapters-data.js',
   './manifest.json'
+  // NOTE: admin.html is deliberately NOT in SHELL — it must never be
+  // served from cache, so there's no reason to precache it either.
 ];
+
+/* Is this request/page the admin panel? Checked two ways:
+   1. The request itself is for admin.html (navigating to the page).
+   2. The request was issued BY a tab that has admin.html open (an API
+      call from admin.html's own script) — found via the client that
+      dispatched the fetch, since admin's API calls hit the same GAS_URL
+      as everything else and can't be told apart by URL alone. */
+async function isAdminOrigin(request, clientId) {
+  const url = new URL(request.url);
+  if (url.pathname.endsWith('admin.html')) return true;
+  if (!clientId) return false;
+  try {
+    const client = await self.clients.get(clientId);
+    return !!(client && client.url && client.url.includes('admin.html'));
+  } catch (e) {
+    return false;
+  }
+}
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -34,61 +69,104 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Removes any cached entry not in the current SHELL list, keeping Drive
+// question-file responses (those live under the same CACHE_NAME but are
+// added dynamically, not part of SHELL, and are still wanted offline) —
+// only strips genuinely orphaned shell-type entries (e.g. an old
+// admin.html left over from before this version, or a removed file).
+async function clearStaleShellEntries() {
+  const cache = await caches.open(CACHE_NAME);
+  const keys = await cache.keys();
+  const shellAbs = new Set(SHELL.map(p => new URL(p, self.registration.scope).href));
+  await Promise.all(keys.map(req => {
+    const url = new URL(req.url);
+    const isDrive = url.hostname.includes('drive.google.com') || url.hostname.includes('googleusercontent.com');
+    const isApi = url.hostname.includes('script.google.com');
+    if (isDrive || isApi) return Promise.resolve(); // leave dynamic/API entries alone
+    if (!shellAbs.has(req.url)) {
+      return cache.delete(req);
+    }
+    return Promise.resolve();
+  }));
+}
+
+// index.html calls this (via postMessage) once checkNet() confirms we've
+// come back online, so any stale leftovers get swept immediately on
+// reconnect rather than waiting for the next SW version bump.
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'CLEAR_STALE_IF_ONLINE') {
+    e.waitUntil ? e.waitUntil(clearStaleShellEntries()) : clearStaleShellEntries();
+  }
+});
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  /* ── API calls: network-first ── */
-  if (url.hostname.includes('script.google.com')) {
-    e.respondWith(
-      fetch(e.request.clone())
-        .catch(() => new Response(
-          JSON.stringify({success: false, error: 'Offline — use cached data'}),
-          {status: 200, headers: {'Content-Type': 'application/json'}}
-        ))
-    );
-    return;
-  }
+  e.respondWith((async () => {
+    const fromAdmin = await isAdminOrigin(e.request, e.clientId);
 
-  /* ── Google Drive file fetch (your question JSONs) ── */
-  if (url.hostname.includes('drive.google.com') || url.hostname.includes('googleusercontent.com')) {
-    e.respondWith(
-      caches.match(e.request).then(cached => {
-        return fetch(e.request.clone())
-          .then(res => {
-            if (res.ok) {
-              const clone = res.clone();
-              caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-            }
-            return res;
-          })
-          .catch(() => cached || new Response(
-            JSON.stringify({success: false, error: 'File not cached'}),
-            {status: 200, headers: {'Content-Type': 'application/json'}}
-          ));
-      })
-    );
-    return;
-  }
+    /* ── ADMIN: bypass the service worker entirely ──
+       No cache read, no cache write, no offline fallback response.
+       If the network fails, the browser's normal failure surfaces —
+       admin.html's own code (checkAdmin_ / api()/post() error paths)
+       is what shows that to the admin, not a fake success:false from
+       here pretending things are fine. */
+    if (fromAdmin) {
+      return fetch(e.request);
+    }
 
-  /* ── App shell: network-first ──
-     Previously this was stale-while-revalidate — it returned whatever was
-     already in Cache Storage immediately, every single time, and only
-     updated the cache in the background for the *next* load. That's a
-     separate cache from the browser's normal HTTP cache, so a hard
-     refresh doesn't touch it — every deploy of index.html/admin.html/
-     app.js was silently losing that race indefinitely for anyone who'd
-     already loaded the app once. Network-first means you always get the
-     live file when online, and only fall back to the cached copy when
-     the network request actually fails (offline use). */
-  e.respondWith(
-    fetch(e.request.clone())
-      .then(res => {
+    /* ── API calls: network-first, offline JSON fallback ── */
+    if (url.hostname.includes('script.google.com')) {
+      try {
+        const res = await fetch(e.request.clone());
+        // A successful round-trip means we're online — sweep any stale
+        // shell leftovers opportunistically (cheap, non-blocking).
+        clearStaleShellEntries();
+        return res;
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Offline — use cached data' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    /* ── Google Drive file fetch (question JSONs) ── */
+    if (url.hostname.includes('drive.google.com') || url.hostname.includes('googleusercontent.com')) {
+      const cached = await caches.match(e.request);
+      try {
+        const res = await fetch(e.request.clone());
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
         }
         return res;
-      })
-      .catch(() => caches.match(e.request).then(cached => cached || new Response('Offline', {status: 503})))
-  );
+      } catch (err) {
+        return cached || new Response(
+          JSON.stringify({ success: false, error: 'File not cached' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    /* ── App shell (index.html/user.html/app.js/etc): network-first ──
+       `cache: 'no-store'` bypasses the browser's own HTTP cache too, not
+       just Cache Storage — so "online" really means online, every time,
+       with zero chance of a stale copy shadowing a live connection.
+       Falls back to the last cached copy only when the fetch itself
+       fails, i.e. genuinely offline. That cached index.html still runs
+       its normal boot logic (resumeUserSession) which resolves a
+       permanent/trial user straight into the app, or shows login. */
+    try {
+      const res = await fetch(e.request.clone(), { cache: 'no-store' });
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return res;
+    } catch (err) {
+      const cached = await caches.match(e.request);
+      return cached || new Response('Offline', { status: 503 });
+    }
+  })());
 });

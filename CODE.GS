@@ -136,7 +136,12 @@ function setup() {
   getUsersSheet_();
   getPaymentsSheet_();
   getSettingsSheet_();
+  getLogsSheet_(); // was missing here — previously only got created lazily on the first admin action, so a fresh setup() run left the Logs tab absent until then.
   initDefaultSettings_();
+  // Idempotent — guarantees every sheet has the correct text-formatting
+  // and column widths whether it was just created above or already
+  // existed from before this update.
+  fixSheetFormatting();
   const ss = getSpreadsheet_();
   Logger.log("✅ Setup complete. Spreadsheet URL: " + ss.getUrl());
   return "Setup complete. Spreadsheet created/verified.";
@@ -160,6 +165,24 @@ function getSpreadsheet_() {
   return spreadsheet;
 }
 
+// Auto-fits columns [colStart..colStart+colCount-1] to their actual content
+// (so short values — paymentAmount "100", a log action name, etc. — get a
+// tight, readable width) and then clamps any column that ended up wider
+// than maxWidthPx back down to it, switching that column to CLIP wrap.
+// This only kicks in for genuine outliers (a ~48,000-char QR data: URI,
+// a long admin log note) — everything else is left at its natural
+// autosized width instead of being flattened to one fixed width.
+function autoResizeCapped_(sheet, colStart, colCount, maxWidthPx) {
+  sheet.autoResizeColumns(colStart, colCount);
+  const maxRows = Math.max(1, sheet.getMaxRows() - 1);
+  for (let c = colStart; c < colStart + colCount; c++) {
+    if (sheet.getColumnWidth(c) > maxWidthPx) {
+      sheet.setColumnWidth(c, maxWidthPx);
+      sheet.getRange(2, c, maxRows, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+    }
+  }
+}
+
 function getUsersSheet_() {
   const spreadsheet = getSpreadsheet_();
   let sheet = spreadsheet.getSheetByName(USERS_SHEET);
@@ -171,9 +194,14 @@ function getUsersSheet_() {
       .setFontWeight("bold")
       .setBackground("#4285f4")
       .setFontColor("white");
-    // Mobile is column 5 (USER_HEADERS index 4) — force plain text so a
-    // digit-only value like "9812345678" is never auto-typed as a Number.
-    sheet.getRange(2, 5, sheet.getMaxRows() - 1, 1).setNumberFormat("@");
+    // Force plain text on every column a person can type digits-only into —
+    // otherwise Sheets silently converts it to a Number, which strips
+    // leading zeros and can round or reformat long digit strings.
+    // username=1 (a person can choose an all-digit username), mobile=5,
+    // contact=6 (mirrors email OR mobile, so carries the same risk).
+    const maxRows = sheet.getMaxRows() - 1;
+    [1, 5, 6].forEach(col => sheet.getRange(2, col, maxRows, 1).setNumberFormat("@"));
+    autoResizeCapped_(sheet, 1, USER_HEADERS.length, 300);
   }
   return sheet;
 }
@@ -189,6 +217,13 @@ function getPaymentsSheet_() {
       .setFontWeight("bold")
       .setBackground("#34a853")
       .setFontColor("white");
+    // mobile=4 and txId=5 are both free-typed and frequently all-digits
+    // (a transaction ID is very often numeric) — same auto-typing risk as
+    // Users.mobile, and previously the actual cause of the payment-upload
+    // crash. Force text on both so they're never silently coerced.
+    const maxRows = sheet.getMaxRows() - 1;
+    [4, 5].forEach(col => sheet.getRange(2, col, maxRows, 1).setNumberFormat("@"));
+    autoResizeCapped_(sheet, 1, PAYMENT_HEADERS.length, 300);
   }
   return sheet;
 }
@@ -204,6 +239,18 @@ function getSettingsSheet_() {
       .setFontWeight("bold")
       .setBackground("#fbbc04")
       .setFontColor("white");
+    // value=2 holds a mix of plain numeric-looking strings (paymentAmount
+    // "100", trialHours "24") AND the QR code as a data:image base64
+    // string tens of thousands of characters long. Force text so the
+    // numeric-looking ones are never coerced to Number (getSettings()
+    // would then hand back 100 instead of "100" — usually harmless, but
+    // not the honest type — and trialHours math depends on it staying a
+    // clean string→Number conversion happening once, deliberately, in
+    // getSettingValue_/handleSignup, not silently in the sheet).
+    const maxRows = sheet.getMaxRows() - 1;
+    sheet.getRange(2, 2, maxRows, 1).setNumberFormat("@");
+    autoResizeCapped_(sheet, 1, 2, 400);
+    sheet.getRange(2, 2, maxRows, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
   }
   return sheet;
 }
@@ -219,9 +266,11 @@ function getLogsSheet_() {
       .setFontWeight("bold")
       .setBackground("#9c27b0")
       .setFontColor("white");
+    autoResizeCapped_(sheet, 1, LOG_HEADERS.length, 320); // details=5 is free text and the usual outlier
   }
   return sheet;
 }
+
 
 // Records one row per admin action. admin.html's "Activity Logs" tab
 // (LOGS module) has always called action=adminListLogs to read this, but
@@ -588,7 +637,8 @@ function handleSignup(p) {
   }
 
   const now = new Date();
-  const trialExpiresAt = new Date(now.getTime() + TRIAL_HOURS * 60 * 60 * 1000);
+  const trialHours = Number(getSettingValue_("trialHours", TRIAL_HOURS)) || TRIAL_HOURS;
+  const trialExpiresAt = new Date(now.getTime() + trialHours * 60 * 60 * 1000);
   const salt = makeSalt_();
 
   sheet.appendRow([
@@ -809,6 +859,18 @@ function getSettings() {
     if (data[i][0]) settings[String(data[i][0])] = data[i][1];
   }
   return { success: true, settings };
+}
+
+// Reads one setting value from the Settings sheet (via getSettings()),
+// falling back to `fallback` if the key is missing/blank. Use this instead
+// of hardcoded constants for anything admin.html exposes as an editable
+// setting (trialHours, paymentAmount, etc.) — otherwise admin edits save to
+// the sheet but the backend keeps using the old hardcoded value, which is
+// exactly the bug this fixed for trialHours.
+function getSettingValue_(key, fallback) {
+  const settings = getSettings().settings || {};
+  const v = settings[key];
+  return (v === undefined || v === null || v === "") ? fallback : v;
 }
 
 // ── QUESTION-FILE PROXY ──
@@ -1183,6 +1245,38 @@ function adminStats(p) {
   };
 }
 
+/**
+ * Run this ONCE from the Apps Script editor if your spreadsheet already
+ * existed before this update — the text-formatting fixes in
+ * getUsersSheet_/getPaymentsSheet_/getSettingsSheet_/getLogsSheet_ above
+ * only apply automatically when a sheet is first CREATED, so an existing
+ * spreadsheet needs this to retrofit the same protection (and won't be
+ * touched again after — safe to re-run any time, it's idempotent).
+ */
+function fixSheetFormatting() {
+  const u = getUsersSheet_();
+  let maxRows = u.getMaxRows() - 1;
+  [1, 5, 6].forEach(col => u.getRange(2, col, maxRows, 1).setNumberFormat("@"));
+  autoResizeCapped_(u, 1, USER_HEADERS.length, 300);
+
+  const p = getPaymentsSheet_();
+  maxRows = p.getMaxRows() - 1;
+  [4, 5].forEach(col => p.getRange(2, col, maxRows, 1).setNumberFormat("@"));
+  autoResizeCapped_(p, 1, PAYMENT_HEADERS.length, 300);
+
+  const s = getSettingsSheet_();
+  maxRows = s.getMaxRows() - 1;
+  s.getRange(2, 2, maxRows, 1).setNumberFormat("@");
+  autoResizeCapped_(s, 1, 2, 400);
+  s.getRange(2, 2, maxRows, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+
+  const l = getLogsSheet_();
+  autoResizeCapped_(l, 1, LOG_HEADERS.length, 320);
+
+  console.log("✅ Sheet formatting fixed/retrofitted on all four sheets.");
+  return "Sheet formatting fixed. Check View → Logs for details.";
+}
+
 /* ═══════════════════════════════════════════════════════════════
    DEBUG / TEST — Run testAll() from the editor to verify everything
    ═══════════════════════════════════════════════════════════════ */
@@ -1329,19 +1423,61 @@ function diagnose() {
   const ss = getSpreadsheet_();
   console.log("Spreadsheet URL:", ss.getUrl());
   console.log("Sheets:", ss.getSheets().map(s => s.getName()).join(", "));
-  
+
   const u = getUsersSheet_();
   console.log("Users rows:", u.getLastRow());
-  
+  // Column type check: username(1)/mobile(5)/contact(6) must read back as
+  // strings. If any of these come back as "number", the sheet's text
+  // formatting fix (fixSheetFormatting()) hasn't been applied/run yet —
+  // re-run setup() or fixSheetFormatting() to correct it.
+  if (u.getLastRow() > 1) {
+    const sample = u.getRange(2, 1, 1, 6).getValues()[0];
+    console.log("Users row 2 types — username:", typeof sample[0], "mobile:", typeof sample[4], "contact:", typeof sample[5]);
+  }
+
   const p = getPaymentsSheet_();
   console.log("Payments rows:", p.getLastRow());
-  
+  if (p.getLastRow() > 1) {
+    const sample = p.getRange(2, 4, 1, 2).getValues()[0];
+    console.log("Payments row 2 types — mobile:", typeof sample[0], "txId:", typeof sample[1]);
+  }
+
+  const l = getLogsSheet_();
+  console.log("Logs rows:", l.getLastRow());
+
   const s = getSettingsSheet_();
   console.log("Settings rows:", s.getLastRow());
-  
+
   const settings = getSettings();
   console.log("Settings:", JSON.stringify(settings));
-  
+  const st = settings.settings || {};
+  ["paymentAmount", "contactPhone", "trialHours"].forEach(k => {
+    console.log("  " + k + ": typeof=" + typeof st[k] + " value=" + st[k]);
+  });
+  if (st.qrCodeUrl) {
+    const isDataUri = String(st.qrCodeUrl).startsWith("data:image");
+    console.log("  qrCodeUrl: " + (isDataUri
+      ? "✅ stored as data:image URI (self-contained, always readable) — length " + st.qrCodeUrl.length
+      : "⚠️ stored as an external link (" + st.qrCodeUrl + ") — Drive share links often fail to load for users; re-upload via admin.html's QR uploader instead"));
+  } else {
+    console.log("  qrCodeUrl: (not set yet)");
+  }
+
   console.log("═══ END ═══");
   return "Diagnostic complete. Check logs.";
+}
+
+// Standalone check for a single Google Drive question-file ID (the kind
+// pasted into chapters-data.js) — run testFileAccess("YOUR_FILE_ID") from
+// the editor to confirm the script's account can actually read it and
+// that it's valid JSON, before wiring it into chapters-data.js.
+function testFileAccess(fileId) {
+  const result = handleGetFile({ fileId: fileId });
+  if (result.success) {
+    const count = Array.isArray(result.result) ? result.result.length : Object.keys(result.result || {}).length;
+    console.log("✅ File '" + fileId + "' is readable and valid JSON (" + count + " top-level items).");
+  } else {
+    console.log("❌ File '" + fileId + "' failed: " + result.error);
+  }
+  return result;
 }

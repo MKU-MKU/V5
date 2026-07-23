@@ -269,6 +269,7 @@ const AUTH = {
     AUTH._updateSidebarCard(user);
     if(!S.online) document.getElementById('offbar').classList.add('show');
     APP.init();
+    TUTORIAL.maybeAutoOpen(user);
   },
 
   _updateSidebarCard(user){
@@ -1759,6 +1760,153 @@ const DATA = {
 };
 
 /* ═══════════════ 11. APP BOOT ═══════════════ */
+/* ═══════════════ TUTORIAL — first-login walkthrough ═══════════════
+   Auto-opens once per account the first time that username reaches
+   user.html (right after AUTH._enter — i.e. regardless of whether they
+   got in as trial, permanent, or yearly). Re-openable anytime from the
+   sidebar (Tools → Tutorial) or the Dashboard Quick Actions tile. */
+const TUTORIAL = {
+  _seenKey: 'ha_tut_seen',
+  _steps: [
+    {
+      icon: '👋',
+      title: 'Welcome to HAMRO AFNAI',
+      body: `<p>This is your Smart Study Hub for Nepal Engineering (Level 5/7) and PSC/Loksewa prep. Once a chapter is cached it works fully offline — handy for load-shedding or weak signal.</p>`
+    },
+    {
+      icon: '🔑',
+      title: 'Your account status',
+      body: `
+        <p>Check the sidebar under your name for your current status:</p>
+        <ul style="margin:0 0 0 1.1rem;padding:0">
+          <li><b>⏳ Trial</b> — free access, counts down live. Pay anytime from the payment screen to go permanent.</li>
+          <li><b>✅ Permanent</b> — verified, unlimited access forever, fully usable offline.</li>
+          <li><b>📅 Yearly</b> — active until the renewal date shown in the sidebar.</li>
+        </ul>
+        <p style="margin-top:.5rem">Once you're Trial, Permanent, or active Yearly, you land straight here next time — no re-login needed on this device, even offline.</p>`
+    },
+    {
+      icon: '🏠',
+      title: 'Your Dashboard',
+      body: `
+        <p>The Dashboard (🏠) is home base:</p>
+        <ul style="margin:0 0 0 1.1rem;padding:0">
+          <li><b>🌟 Daily Challenge</b> — 30 mixed questions, keeps your streak alive.</li>
+          <li><b>⚡ Adaptive Practice</b> — pulls the questions you're actually struggling with first.</li>
+          <li>Quick stats and Quick Action tiles for everything else in the app.</li>
+        </ul>`
+    },
+    {
+      icon: '📚',
+      title: 'Studying a chapter',
+      body: `
+        <p>Open <b>Online Study</b> or <b>Local File</b> from the sidebar, pick a chapter, choose how many questions and whether to shuffle, then pick a mode:</p>
+        <ul style="margin:0 0 0 1.1rem;padding:0">
+          <li><b>Practice</b> — instant feedback, no time pressure.</li>
+          <li><b>📝 Exam</b> — timed, graded at the end.</li>
+          <li><b>⚡ Flashcard</b> — quick flip-through review.</li>
+        </ul>
+        <p style="margin-top:.5rem">Shortcuts while answering: <b>A/B/C/D</b> or <b>1–5</b> to pick an option, <b>←/→</b> between cards, <b>Esc</b> to quit.</p>`
+    },
+    {
+      icon: '⭐',
+      title: 'Bookmarks, Flags & Wrong Bank',
+      body: `
+        <p>Tag any question while studying:</p>
+        <ul style="margin:0 0 0 1.1rem;padding:0">
+          <li><b>⭐ Bookmarks</b> — save with a label (Need Check, Interesting, Debating, Confusing, Formulae).</li>
+          <li><b>🚩 Flagged</b> — a quick "come back to this" marker.</li>
+          <li><b>❌ Wrong Bank</b> — anything you get wrong lands here automatically, and needs two correct answers in a row, spaced a few days apart, before it's considered mastered.</li>
+        </ul>`
+    },
+    {
+      icon: '📅',
+      title: 'Timetable & Progress',
+      body: `<p><b>Timetable</b> lets you block out study sessions by day/time — the Dashboard clock shows what's happening right now. <b>Progress</b> tracks your accuracy over time and predicts your likely exam marks from recent sessions.</p>`
+    },
+    {
+      icon: '📦',
+      title: 'Offline & installing the app',
+      body: `
+        <p>Chapters you open get cached automatically for offline use — check <b>Offline Cache</b> in the sidebar to manage what's stored on this device.</p>
+        <p style="margin-top:.5rem">Tap the <b>📲</b> icon in the top bar to install HAMRO AFNAI to your home screen — it then opens like a normal app, even with no signal. You can reopen this tutorial anytime from the sidebar or the Dashboard's Quick Actions.</p>`
+    }
+  ],
+  _idx: 0,
+
+  // Called from AUTH._enter() on every successful entry into user.html.
+  // Only actually opens the first time a given username reaches this
+  // screen — status changing from trial→paid→permanent doesn't re-open it,
+  // since it's the same account and they've already seen it.
+  maybeAutoOpen(user) {
+    if (!user || !user.username) return;
+    const seen = _load(TUTORIAL._seenKey, {});
+    if (seen[user.username]) return;
+    setTimeout(() => TUTORIAL.open(), 600);
+  },
+
+  open() {
+    if (document.getElementById('tut-modal')) return;
+    TUTORIAL._idx = 0;
+    const modal = document.createElement('div');
+    modal.id = 'tut-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1.2rem;backdrop-filter:blur(4px)';
+    modal.innerHTML = `
+      <div style="background:var(--c2);border:1px solid var(--bd);border-radius:var(--r3);padding:1.4rem;max-width:420px;width:100%;box-shadow:var(--sh3);max-height:88vh;display:flex;flex-direction:column">
+        <div id="tut-dots" style="display:flex;gap:.3rem;margin-bottom:.9rem;justify-content:center"></div>
+        <div style="flex:1;overflow-y:auto;min-height:0" id="tut-body"></div>
+        <div style="display:flex;gap:.4rem;margin-top:1rem">
+          <button id="tut-back" style="padding:.6rem .9rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-size:.82rem;cursor:pointer;font-family:var(--ff)">← Back</button>
+          <button id="tut-next" style="flex:1;padding:.62rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:#0F0A00;font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">Next →</button>
+        </div>
+        <button id="tut-skip" style="margin-top:.55rem;background:none;border:none;color:var(--t3);font-size:.72rem;cursor:pointer;font-family:var(--ff);text-decoration:underline">Skip tutorial</button>
+      </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('tut-back').onclick = () => TUTORIAL._go(-1);
+    document.getElementById('tut-next').onclick = () => TUTORIAL._go(1);
+    document.getElementById('tut-skip').onclick = () => TUTORIAL._finish();
+    TUTORIAL._render();
+  },
+
+  _go(dir) {
+    const n = TUTORIAL._idx + dir;
+    if (n < 0) return;
+    if (n >= TUTORIAL._steps.length) { TUTORIAL._finish(); return; }
+    TUTORIAL._idx = n;
+    TUTORIAL._render();
+  },
+
+  _render() {
+    const step = TUTORIAL._steps[TUTORIAL._idx];
+    const body = document.getElementById('tut-body');
+    if (!body) return;
+    body.innerHTML = `
+      <div style="font-size:1.6rem;margin-bottom:.3rem">${step.icon}</div>
+      <div style="font-family:var(--fd);font-size:1rem;font-weight:700;color:var(--t1);margin-bottom:.5rem">${step.title}</div>
+      <div style="font-size:.82rem;color:var(--t2);line-height:1.55">${step.body}</div>`;
+    const dots = document.getElementById('tut-dots');
+    if (dots) {
+      dots.innerHTML = TUTORIAL._steps.map((_, i) =>
+        `<div style="width:${i === TUTORIAL._idx ? '18px' : '6px'};height:6px;border-radius:3px;background:${i === TUTORIAL._idx ? 'var(--amb)' : 'var(--b1)'};transition:.2s"></div>`
+      ).join('');
+    }
+    const backBtn = document.getElementById('tut-back');
+    if (backBtn) backBtn.style.visibility = TUTORIAL._idx === 0 ? 'hidden' : 'visible';
+    const nextBtn = document.getElementById('tut-next');
+    if (nextBtn) nextBtn.textContent = TUTORIAL._idx === TUTORIAL._steps.length - 1 ? "Got it — let's study! →" : 'Next →';
+  },
+
+  _finish() {
+    const modal = document.getElementById('tut-modal');
+    if (modal) modal.remove();
+    if (S.user && S.user.username) {
+      const seen = _load(TUTORIAL._seenKey, {});
+      seen[S.user.username] = true;
+      _save(TUTORIAL._seenKey, seen);
+    }
+  }
+};
+
 const APP = {
   init(){
     if(_load('ha_theme','dark')==='light') document.body.classList.add('light');
@@ -1868,4 +2016,5 @@ window.STREAK = STREAK;
 window.TT = TT;
 window.CACHE = CACHE;
 window.DATA = DATA;
+window.TUTORIAL = TUTORIAL;
 window.APP = APP;

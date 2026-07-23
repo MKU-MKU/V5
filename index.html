@@ -348,12 +348,29 @@ const APP = {
       if (!wasOnline && this.mode === 'payment') {
         this.loadPaymentUI();
       }
+      // Just confirmed we're online (possibly a fresh reconnect) — ask the
+      // SW to sweep any stale shell entries out of Cache Storage now,
+      // rather than waiting for the next SW version bump.
+      if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_STALE_IF_ONLINE' });
+      }
     } catch (e) {
       this.online = false;
       dot.className = 'ndot off';
       txt.textContent = 'Offline mode';
       if (this.session) badge.classList.add('show');
     }
+    this.updatePayButtonState();
+  },
+
+  // Payment can only ever be submitted online (unlike login, which trusts a
+  // cached 'permanent' session offline) — grey out the button proactively
+  // instead of letting the user tap it and hit a network error.
+  updatePayButtonState() {
+    const btn = document.getElementById('btn-pay');
+    if (!btn) return;
+    btn.disabled = !this.online;
+    btn.textContent = this.online ? 'Submit Payment →' : 'Offline — reconnect to pay';
   },
 
   /* ── Session helpers ── */
@@ -666,6 +683,7 @@ const APP = {
 
   /* ── Payment UI ── */
   async loadPaymentUI() {
+    this.updatePayButtonState();
     let s = this.settings || {};
     // Always try to fetch fresh settings when online, so a change made in
     // admin.html (on any device) shows up here immediately instead of only
@@ -724,6 +742,11 @@ const APP = {
     const rem = document.getElementById('pay-rem').value.trim();
     if (!txn) return this.showErr('Transaction ID is required.');
     if (!this.session || this.session.type !== 'user') return this.showErr('Session error. Please login again.');
+    // Payment verification always requires the backend — there is no offline
+    // path for this (unlike login, which trusts a cached 'permanent' session).
+    // Fail fast with a clear message instead of letting the fetch inside
+    // api() time out and surface a generic "Network error" string.
+    if (!this.online) return this.showErr('You need an internet connection to submit payment. Please reconnect and try again.');
 
     this.setLoading('btn-pay', true);
     const payload = {
