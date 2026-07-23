@@ -203,7 +203,7 @@ const AUTH = {
     }
     // Online: re-validate against the server, same contract index.html uses.
     try{
-      const r = await netFetch(`${APPS}?${qs({action:'checkSession', username:u.username})}`, {redirect:'follow'});
+      const r = await netFetch(`${APPS}?${qs({action:'checkSession', token:u.token, username:u.username})}`, {redirect:'follow'});
       const res = await r.json();
       if(!res.success){ AUTH._bounce(); return; }
       const updated = AUTH._buildSession(u, res);
@@ -304,7 +304,7 @@ const AUTH = {
     AUTH._revalidateTimer = setInterval(async ()=>{
       if(!S.online || S.forcedOffline || !S.user) return;
       try{
-        const r = await netFetch(`${APPS}?${qs({action:'checkSession', username:S.user.username})}`, {redirect:'follow'});
+        const r = await netFetch(`${APPS}?${qs({action:'checkSession', token:S.user.token, username:S.user.username})}`, {redirect:'follow'});
         const res = await r.json();
         if(res.success){
           const updated = AUTH._buildSession(S.user, res);
