@@ -420,6 +420,23 @@ const APP = {
     });
     this.hideErr();
     if (m !== 'trial') this.clearTrialTimer();
+
+    // Auto-refresh payment settings (amount/phone/instructions/QR) every 20s
+    // while the payment screen is open, so an admin edit made in admin.html
+    // shows up on an already-open payment page on its own — previously this
+    // only happened once, whenever the screen was first entered, so a
+    // change made mid-visit needed a manual reload (or the console snippet)
+    // to appear. Cleared the moment the user leaves the payment screen.
+    if (m === 'payment') {
+      if (!this._payRefreshTimer) {
+        this._payRefreshTimer = setInterval(() => {
+          if (this.mode === 'payment' && this.online) this.loadPaymentUI();
+        }, 20000);
+      }
+    } else if (this._payRefreshTimer) {
+      clearInterval(this._payRefreshTimer);
+      this._payRefreshTimer = null;
+    }
   },
 
   showErr(msg) {
